@@ -1,0 +1,10 @@
+columns:
+    tier_name:
+        label: 'websquids.gymdirectory::lang.name'
+        type: text
+    price:
+        label: Price
+        type: number
+    frequency:
+        label: Frequency
+        type: text

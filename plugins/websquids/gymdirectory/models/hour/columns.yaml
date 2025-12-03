@@ -1,0 +1,10 @@
+columns:
+    day:
+        label: Day
+        type: text
+    from:
+        label: From
+        type: time
+    to:
+        label: To
+        type: time

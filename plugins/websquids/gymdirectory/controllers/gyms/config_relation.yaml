@@ -1,0 +1,35 @@
+# ===================================
+#  Relation Behavior Config
+# ===================================
+
+pricing:
+    label: Pricing Tiers
+    view:
+        list: $/websquids/gymdirectory/models/pricing/columns.yaml
+        toolbarButtons: create|delete
+    manage:
+        form: $/websquids/gymdirectory/models/pricing/fields.yaml
+
+hours:
+    label: Hours
+    view:
+        list: $/websquids/gymdirectory/models/hour/columns.yaml
+        toolbarButtons: create|delete
+    manage:
+        form: $/websquids/gymdirectory/models/hour/fields.yaml
+
+reviews:
+    label: Reviews
+    view:
+        list: $/websquids/gymdirectory/models/review/columns.yaml
+        toolbarButtons: create|delete
+    manage:
+        form: $/websquids/gymdirectory/models/review/fields.yaml
+
+faqs:
+    label: FAQs
+    view:
+        list: $/websquids/gymdirectory/models/faq/columns.yaml
+        toolbarButtons: create|delete
+    manage:
+        form: $/websquids/gymdirectory/models/faq/fields.yaml

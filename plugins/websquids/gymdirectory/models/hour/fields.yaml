@@ -1,0 +1,16 @@
+fields:
+    day:
+        label: Day
+        span: full
+        showSearch: true
+        type: dropdown
+    from:
+        label: From
+        mode: time
+        span: auto
+        type: datepicker
+    to:
+        label: To
+        mode: time
+        span: auto
+        type: datepicker

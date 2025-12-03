@@ -1,0 +1,14 @@
+columns:
+    id:
+        label: ID
+        type: number
+        searchable: true
+        invisible: false
+        sortable: true
+    name:
+        label: 'websquids.gymdirectory::lang.plugin.name'
+        type: text
+        sortable: true
+    logo:
+        label: Logo
+        type: image

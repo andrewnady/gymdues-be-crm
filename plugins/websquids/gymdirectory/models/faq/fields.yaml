@@ -1,0 +1,16 @@
+fields:
+    category:
+        label: Category
+        showSearch: true
+        span: full
+        type: dropdown
+    question:
+        label: Question
+        size: ''
+        span: full
+        type: richeditor
+    answer:
+        label: Answer
+        size: ''
+        span: full
+        type: richeditor

@@ -1,0 +1,39 @@
+<?php
+
+namespace websquids\Gymdirectory\Models;
+
+use Model;
+
+/**
+ * Model
+ */
+class Pricing extends Model {
+    use \Winter\Storm\Database\Traits\Validation;
+
+    use \Winter\Storm\Database\Traits\SoftDelete;
+
+    protected $dates = ['deleted_at'];
+
+
+    /**
+     * @var string The database table used by the model.
+     */
+    public $table = 'websquids_gymdirectory_pricing';
+
+    /**
+     * @var array Validation rules
+     */
+    public $rules = [];
+
+    public $belongsTo = [
+        'gym' => [
+            Gym::class,
+            'key' => 'gym_id'
+        ],
+    ];
+    
+    /**
+     * @var array Attribute names to encode and decode using JSON.
+     */
+    public $jsonable = [];
+}

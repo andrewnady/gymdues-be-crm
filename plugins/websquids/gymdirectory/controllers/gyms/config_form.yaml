@@ -1,0 +1,10 @@
+name: Gyms
+form: $/websquids/gymdirectory/models/gym/fields.yaml
+modelClass: websquids\Gymdirectory\Models\Gym
+defaultRedirect: websquids/gymdirectory/gyms
+create:
+    redirect: 'websquids/gymdirectory/gyms/update/:id'
+    redirectClose: websquids/gymdirectory/gyms
+update:
+    redirect: websquids/gymdirectory/gyms
+    redirectClose: websquids/gymdirectory/gyms

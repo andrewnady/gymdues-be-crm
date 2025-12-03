@@ -1,0 +1,19 @@
+fields:
+    reviewed_at:
+        label: 'Reviewed At'
+        span: full
+        mode: datetime
+        type: datepicker
+    reviewer:
+        label: Reviewer
+        span: auto
+        type: text
+    rate:
+        label: Rate
+        span: auto
+        type: number
+    text:
+        label: Review
+        span: full
+        size: ''
+        type: richeditor

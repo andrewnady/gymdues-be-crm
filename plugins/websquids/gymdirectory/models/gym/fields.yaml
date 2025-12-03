@@ -1,0 +1,53 @@
+fields:
+    name:
+        label: 'websquids.gymdirectory::lang.name'
+        span: auto
+        type: text
+        tab: 'Tab 1'
+    logo:
+        label: Logo
+        mode: file
+        useCaption: true
+        thumbOptions:
+            mode: crop
+            extension: auto
+        span: auto
+        type: fileupload
+        tab: 'Tab 1'
+    description:
+        label: 'websquids.gymdirectory::lang.plugin.description'
+        size: ''
+        span: full
+        type: richeditor
+    gallery:
+        label: Gallery
+        mode: file
+        useCaption: true
+        thumbOptions:
+            mode: crop
+            extension: auto
+        span: full
+        type: fileupload
+tabs:
+    fields:
+        pricing:
+            span: full
+            path: $/websquids/gymdirectory/controllers/gyms/_relation_pricing.htm
+            type: partial
+            tab: Pricing
+        hours:
+            span: full
+            cssClass: ''
+            path: $/websquids/gymdirectory/controllers/gyms/_relation_hours.htm
+            type: partial
+            tab: Hours
+        reviews:
+            span: full
+            path: $/websquids/gymdirectory/controllers/gyms/_relation_reviews.htm
+            type: partial
+            tab: Reviews
+        faqs:
+            span: full
+            path: $/websquids/gymdirectory/controllers/gyms/_relation_faqs.htm
+            type: partial
+            tab: FAQs

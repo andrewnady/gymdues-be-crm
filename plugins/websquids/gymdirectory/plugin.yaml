@@ -1,0 +1,10 @@
+plugin:
+    name: 'websquids.gymdirectory::lang.plugin.name'
+    description: 'websquids.gymdirectory::lang.plugin.description'
+    author: websquids
+    icon: 'fas icon-dumbbell'
+navigation:
+    main-menu-item:
+        label: 'websquids.gymdirectory::lang.plugin.name'
+        url: websquids/gymdirectory/gyms
+        icon: icon-list

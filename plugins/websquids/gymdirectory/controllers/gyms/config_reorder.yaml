@@ -1,0 +1,4 @@
+title: Gyms
+modelClass: websquids\Gymdirectory\Models\Gym
+toolbar:
+    buttons: reorder_toolbar

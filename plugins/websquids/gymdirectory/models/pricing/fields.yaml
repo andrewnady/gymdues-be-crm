@@ -1,0 +1,18 @@
+fields:
+    tier_name:
+        label: 'websquids.gymdirectory::lang.name'
+        span: full
+        type: text
+    price:
+        label: Price
+        span: auto
+        type: number
+    frequency:
+        label: Frequency
+        span: auto
+        type: text
+    description:
+        label: 'websquids.gymdirectory::lang.plugin.description'
+        span: full
+        size: ''
+        type: richeditor
