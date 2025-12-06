@@ -8,3 +8,16 @@ navigation:
         label: 'websquids.gymdirectory::lang.plugin.name'
         url: websquids/gymdirectory/gyms
         icon: icon-list
+        sideMenu:
+            gyms:
+                label: Gyms
+                url: websquids/gymdirectory/gyms
+                icon: icon-list
+            reviews:
+                label: Reviews
+                url: websquids/gymdirectory/reviews
+                icon: icon-list
+            pricing:
+                label: Memberships
+                url: websquids/gymdirectory/pricing
+                icon: icon-sitemap

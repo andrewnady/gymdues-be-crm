@@ -12,3 +12,8 @@ columns:
     logo:
         label: Logo
         type: image
+    trending:
+        label: Trending
+        type: switch
+        searchable: true
+        sortable: true

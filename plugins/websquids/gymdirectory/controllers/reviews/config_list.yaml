@@ -1,0 +1,12 @@
+title: Reviews
+modelClass: websquids\Gymdirectory\Models\Review
+list: $/websquids/gymdirectory/models/review/list.yaml
+recordUrl: 'websquids/gymdirectory/reviews/update/:id'
+noRecordsMessage: 'backend::lang.list.no_records'
+recordsPerPage: 20
+showSetup: true
+showCheckboxes: true
+toolbar:
+    buttons: list_toolbar
+    search:
+        prompt: 'backend::lang.list.search_prompt'

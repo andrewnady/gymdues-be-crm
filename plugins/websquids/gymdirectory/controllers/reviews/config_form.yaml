@@ -1,0 +1,10 @@
+name: Reviews
+form: $/websquids/gymdirectory/models/review/fields.yaml
+modelClass: websquids\Gymdirectory\Models\Review
+defaultRedirect: websquids/gymdirectory/reviews
+create:
+    redirect: 'websquids/gymdirectory/reviews/update/:id'
+    redirectClose: websquids/gymdirectory/reviews
+update:
+    redirect: websquids/gymdirectory/reviews
+    redirectClose: websquids/gymdirectory/reviews

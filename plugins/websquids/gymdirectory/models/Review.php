@@ -24,6 +24,13 @@ class Review extends Model
      */
     public $rules = [
     ];
+
+    public $belongsTo = [
+        'gym' => [
+            Gym::class,
+            'key' => 'gym_id'
+        ],
+    ];
     
     /**
      * @var array Attribute names to encode and decode using JSON.

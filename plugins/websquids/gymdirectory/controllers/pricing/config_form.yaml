@@ -1,0 +1,10 @@
+name: Pricing
+form: $/websquids/gymdirectory/models/pricing/fields.yaml
+modelClass: websquids\Gymdirectory\Models\Pricing
+defaultRedirect: websquids/gymdirectory/pricing
+create:
+    redirect: 'websquids/gymdirectory/pricing/update/:id'
+    redirectClose: websquids/gymdirectory/pricing
+update:
+    redirect: websquids/gymdirectory/pricing
+    redirectClose: websquids/gymdirectory/pricing

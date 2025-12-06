@@ -1,0 +1,30 @@
+columns:
+    id:
+        label: id
+        type: number
+    gym:
+        label: Gym
+        type: text
+        select: name
+        relation: gym
+    tier_name:
+        label: tier_name
+        type: text
+    price:
+        label: price
+        type: text
+    frequency:
+        label: frequency
+        type: text
+    description:
+        label: description
+        type: text
+    created_at:
+        label: created_at
+        type: datetime
+    updated_at:
+        label: updated_at
+        type: datetime
+    deleted_at:
+        label: deleted_at
+        type: datetime

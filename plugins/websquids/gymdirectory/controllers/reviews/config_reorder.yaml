@@ -1,0 +1,4 @@
+title: Reviews
+modelClass: websquids\Gymdirectory\Models\Review
+toolbar:
+    buttons: reorder_toolbar

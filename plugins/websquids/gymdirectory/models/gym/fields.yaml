@@ -1,9 +1,13 @@
 fields:
+    trending:
+        label: Trending
+        span: full
+        type: switch
     name:
         label: 'websquids.gymdirectory::lang.name'
         span: auto
+        required: 1
         type: text
-        tab: 'Tab 1'
     logo:
         label: Logo
         mode: file
@@ -12,12 +16,13 @@ fields:
             mode: crop
             extension: auto
         span: auto
+        required: 1
         type: fileupload
-        tab: 'Tab 1'
     description:
-        label: 'websquids.gymdirectory::lang.plugin.description'
+        label: Description
         size: ''
         span: full
+        required: 1
         type: richeditor
     gallery:
         label: Gallery
@@ -28,6 +33,18 @@ fields:
             extension: auto
         span: full
         type: fileupload
+    city:
+        label: City
+        span: auto
+        type: text
+    state:
+        label: State
+        span: auto
+        type: text
+    slug:
+        label: Slug
+        span: full
+        type: text
 tabs:
     fields:
         pricing:
