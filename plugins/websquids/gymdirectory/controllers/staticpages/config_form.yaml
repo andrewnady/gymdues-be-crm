@@ -1,0 +1,11 @@
+name: Static Page
+form: $/websquids/gymdirectory/models/staticpage/fields.yaml
+modelClass: websquids\Gymdirectory\Models\StaticPage
+defaultRedirect: websquids/gymdirectory/staticpages
+create:
+    redirect: 'websquids/gymdirectory/staticpages/update/:id'
+    redirectClose: websquids/gymdirectory/staticpages
+update:
+    redirect: websquids/gymdirectory/staticpages
+    redirectClose: websquids/gymdirectory/staticpages
+

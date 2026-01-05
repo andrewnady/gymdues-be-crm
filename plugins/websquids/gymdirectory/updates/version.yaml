@@ -63,3 +63,6 @@
 1.0.22:
     - 'Updated table websquids_gymdirectory_gyms'
     - builder_table_update_websquids_gymdirectory_gyms_8.php
+1.0.23:
+    - 'Created table websquids_gymdirectory_static_pages'
+    - builder_table_create_websquids_gymdirectory_static_pages.php

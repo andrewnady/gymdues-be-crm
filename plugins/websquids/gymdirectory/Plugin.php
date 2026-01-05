@@ -11,4 +11,31 @@ class Plugin extends PluginBase
     public function registerSettings()
     {
     }
+
+    public function registerNavigation()
+    {
+        return [
+            'gymdirectory' => [
+                'label' => 'Gym Directory',
+                'url' => \Backend::url('websquids/gymdirectory/gyms'),
+                'icon' => 'icon-dumbbell',
+                'permissions' => ['websquids.gymdirectory.*'],
+                'order' => 500,
+                'sideMenu' => [
+                    'gyms' => [
+                        'label' => 'Gyms',
+                        'icon' => 'icon-building',
+                        'url' => \Backend::url('websquids/gymdirectory/gyms'),
+                        'permissions' => ['websquids.gymdirectory.manage_gyms'],
+                    ],
+                    'staticpages' => [
+                        'label' => 'Static Pages',
+                        'icon' => 'icon-file-text',
+                        'url' => \Backend::url('websquids/gymdirectory/staticpages'),
+                        'permissions' => ['websquids.gymdirectory.manage_static_pages'],
+                    ],
+                ],
+            ],
+        ];
+    }
 }

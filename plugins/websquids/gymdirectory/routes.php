@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use websquids\Gymdirectory\Classes\ApiKeyMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
+use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
 
 Route::prefix('api/v1')
   ->middleware([ApiKeyMiddleware::class])
@@ -15,4 +16,8 @@ Route::prefix('api/v1')
     // Reviews routes
     Route::get('reviews', [ReviewsController::class, 'index']);
     Route::get('reviews/{id}', [ReviewsController::class, 'show']);
+    
+    // Static pages routes
+    Route::get('static-pages', [StaticPagesController::class, 'index']);
+    Route::get('static-pages/{slug}', [StaticPagesController::class, 'show']);
   });

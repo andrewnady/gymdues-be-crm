@@ -1,0 +1,55 @@
+fields:
+    title:
+        label: Title
+        type: text
+        required: true
+        span: left
+
+    slug:
+        label: Slug
+        type: text
+        required: true
+        span: right
+        comment: 'URL-friendly identifier (e.g., terms-of-service)'
+
+    content:
+        label: Content
+        type: richeditor
+        required: true
+        size: huge
+        toolbarButtons: fullscreen|bold|italic|underline|strikeThrough|subscript|superscript|fontFamily|fontSize|color|emoticons|inlineStyle|paragraphStyle|lineHeight|table|link|image|video|file|alignment|formatOL|formatUL|outdent|indent|quote|insertHR|undo|redo|clearFormatting|selectAll|html
+
+    is_published:
+        label: Published
+        type: checkbox
+        default: true
+        span: left
+
+    meta_title:
+        label: Meta Title
+        type: text
+        span: left
+        comment: 'SEO meta title (optional)'
+
+    meta_description:
+        label: Meta Description
+        type: textarea
+        span: right
+        comment: 'SEO meta description (optional)'
+
+tabs:
+    fields:
+        created_at:
+            label: Created
+            type: datepicker
+            mode: date
+            disabled: true
+            span: left
+
+        updated_at:
+            label: Updated
+            type: datepicker
+            mode: date
+            disabled: true
+            span: right
+
