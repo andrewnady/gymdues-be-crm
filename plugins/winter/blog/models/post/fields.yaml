@@ -1,0 +1,91 @@
+# ===================================
+#  Field Definitions
+# ===================================
+
+fields:
+
+    title:
+        label: winter.blog::lang.post.title
+        span: left
+        placeholder: winter.blog::lang.post.title_placeholder
+
+    slug:
+        label: winter.blog::lang.post.slug
+        span: right
+        placeholder: winter.blog::lang.post.slug_placeholder
+        preset:
+            field: title
+            type: slug
+
+    toolbar:
+        type: partial
+        cssClass: collapse-visible
+
+tabs:
+    stretch: true
+    cssClass: master-area
+    paneCssClass:
+        0: pane-compact
+    icons:
+        winter.blog::lang.post.tab_edit: icon-pencil
+        winter.blog::lang.post.tab_categories: icon-tags
+        winter.blog::lang.post.tab_manage: icon-cog
+    fields:
+        content:
+            tab: winter.blog::lang.post.tab_edit
+            type: richeditor
+            cssClass: field-slim
+            stretch: true
+
+        categories:
+            tab: winter.blog::lang.post.tab_categories
+            type: relation
+            commentAbove: winter.blog::lang.post.categories_comment
+            placeholder: winter.blog::lang.post.categories_placeholder
+
+        published:
+            tab: winter.blog::lang.post.tab_manage
+            label: winter.blog::lang.post.published
+            span: left
+            type: checkbox
+
+        user:
+            tab: winter.blog::lang.post.tab_manage
+            label: winter.blog::lang.post.published_by
+            span: right
+            type: relation
+            nameFrom: login
+            emptyOption: winter.blog::lang.post.current_user
+
+        published_at:
+            tab: winter.blog::lang.post.tab_manage
+            label: winter.blog::lang.post.published_on
+            span: left
+            type: datepicker
+            mode: datetime
+            trigger:
+                action: enable
+                field: published
+                condition: checked
+
+        metadata[preview_page]:
+            tab: winter.blog::lang.post.tab_manage
+            label: winter.blog::lang.post.preview_page
+            commentAbove: winter.blog::lang.post.preview_page_comment
+            span: auto
+            type: dropdown
+            options: getCmsPageOptions
+
+        excerpt:
+            tab: winter.blog::lang.post.tab_manage
+            label: winter.blog::lang.post.excerpt
+            type: textarea
+            size: small
+
+        featured_images:
+            tab: winter.blog::lang.post.tab_manage
+            label: winter.blog::lang.post.featured_images
+            type: fileupload
+            mode: image
+            imageWidth: 200
+            imageHeight: 200

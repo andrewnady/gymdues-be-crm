@@ -1,6 +1,6 @@
 <?php
 
-namespace Websquids\Gymdirectory\Controllers\Api;
+namespace Winter\Blog\Controllers\Api;
 
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;

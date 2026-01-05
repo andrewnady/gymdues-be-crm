@@ -7,7 +7,7 @@ use Model;
 /**
  * Model
  */
-class FAQ extends Model {
+class Faq extends Model {
     use \Winter\Storm\Database\Traits\Validation;
 
     use \Winter\Storm\Database\Traits\SoftDelete;
