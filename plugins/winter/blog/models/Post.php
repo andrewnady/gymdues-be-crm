@@ -11,6 +11,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Lang;
 use System\Models\File;
 use Winter\Blog\Classes\TagProcessor;
+use Winter\Blog\Models\Comment;
 use Winter\Blog\Models\Settings as BlogSettings;
 use Winter\Pages\Classes\MenuItem;
 use Winter\Sitemap\Classes\DefinitionItem;
@@ -107,6 +108,14 @@ class Post extends Model
         ],
         'content_images'  => [
             File::class,
+        ],
+    ];
+
+    public $hasMany = [
+        'comments' => [
+            Comment::class,
+            'key' => 'post_id',
+            'order' => 'created_at desc',
         ],
     ];
 

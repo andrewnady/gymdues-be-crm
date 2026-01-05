@@ -1,0 +1,44 @@
+columns:
+    id:
+        label: ID
+        type: number
+        searchable: true
+        sortable: true
+        width: 60
+
+    post:
+        label: Post
+        relation: post
+        select: title
+        searchable: true
+        sortable: true
+
+    name:
+        label: Name
+        type: text
+        searchable: true
+        sortable: true
+
+    email:
+        label: Email
+        type: text
+        searchable: true
+        sortable: true
+
+    comment:
+        label: Comment
+        type: text
+        searchable: true
+        sortable: false
+
+    is_approved:
+        label: Approved
+        type: switch
+        sortable: true
+
+    created_at:
+        label: Created
+        type: datetime
+        sortable: true
+        width: 150
+

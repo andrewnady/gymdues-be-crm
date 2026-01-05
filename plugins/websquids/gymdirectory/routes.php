@@ -5,6 +5,7 @@ use websquids\Gymdirectory\Classes\ApiKeyMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
+use Winter\Blog\Controllers\Api\CommentsController;
 
 Route::prefix('api/v1')
   ->middleware([ApiKeyMiddleware::class])
@@ -20,4 +21,8 @@ Route::prefix('api/v1')
     // Static pages routes
     Route::get('static-pages', [StaticPagesController::class, 'index']);
     Route::get('static-pages/{slug}', [StaticPagesController::class, 'show']);
+    
+    // Blog comments routes
+    Route::get('posts/{slug}/comments', [CommentsController::class, 'index']);
+    Route::post('posts/{slug}/comments', [CommentsController::class, 'store']);
   });

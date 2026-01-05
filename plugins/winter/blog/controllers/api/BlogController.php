@@ -52,9 +52,13 @@ class BlogController extends Controller {
     $posts = $query->paginate($perPage);
 
     // Transform data
-    $posts->getCollection()->transform(function ($post) {
+    // @phpstan-ignore-next-line - getCollection() exists on paginator
+    $collection = $posts->getCollection();
+    $transformed = $collection->map(function ($post) {
       return $this->transformPost($post);
     });
+    // @phpstan-ignore-next-line - setCollection() exists on paginator
+    $posts->setCollection($transformed);
 
     return $posts;
   }
@@ -151,7 +155,7 @@ class BlogController extends Controller {
       'author' => $post->user ? [
         'id' => $post->user->id,
         'name' => $post->user->full_name ?? $post->user->login ?? 'Unknown',
-        'avatar' => $post->user->getAvatarThumb('full'),
+        'avatar' => $post->user->avatar?->path,
       ] : null,
     ];
 
