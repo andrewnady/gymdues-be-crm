@@ -14,8 +14,7 @@ class BlogController extends Controller {
    */
   public function index(Request $request) {
     // Query posts
-    $query = Post::with(['categories', 'featured_images', 'user'])
-      ->orderBy('published_at', 'desc');
+    $query = Post::with(['categories', 'featured_images', 'user']);
 
     // Filter by published status
     if ($request->has('published')) {
@@ -43,6 +42,10 @@ class BlogController extends Controller {
           ->orWhere('excerpt', 'like', "%{$search}%");
       });
     }
+
+    // Sort by published_at descending (newest first), with fallback to created_at
+    $query->orderBy('published_at', 'desc')
+      ->orderBy('created_at', 'desc');
 
     // Pagination
     $perPage = $request->input('per_page', 10);
@@ -96,7 +99,7 @@ class BlogController extends Controller {
     $post->content = $data['content'];
     $post->excerpt = $data['excerpt'] ?? '';
     $post->published = $data['published'] ?? false;
-    
+
     if (isset($data['published_at'])) {
       $post->published_at = $data['published_at'];
     } elseif ($post->published && !$post->published_at) {
@@ -117,72 +120,6 @@ class BlogController extends Controller {
   }
 
   /**
-   * PUT /api/v1/posts/{slug}
-   * Update an existing blog post
-   */
-  public function update(Request $request, $slug) {
-    $post = Post::where('slug', $slug)->firstOrFail();
-
-    $data = $request->validate([
-      'title' => 'sometimes|string|max:255',
-      'slug' => 'sometimes|string|max:255|unique:winter_blog_posts,slug,' . $post->id,
-      'content' => 'sometimes|string',
-      'excerpt' => 'nullable|string',
-      'published' => 'sometimes|boolean',
-      'published_at' => 'nullable|date',
-      'categories' => 'sometimes|array',
-      'categories.*' => 'exists:winter_blog_categories,id',
-    ]);
-
-    // Update post fields
-    if (isset($data['title'])) {
-      $post->title = $data['title'];
-    }
-    if (isset($data['slug'])) {
-      $post->slug = $data['slug'];
-    }
-    if (isset($data['content'])) {
-      $post->content = $data['content'];
-    }
-    if (isset($data['excerpt'])) {
-      $post->excerpt = $data['excerpt'];
-    }
-    if (isset($data['published'])) {
-      $post->published = $data['published'];
-    }
-    if (isset($data['published_at'])) {
-      $post->published_at = $data['published_at'];
-    } elseif ($post->published && !$post->published_at) {
-      $post->published_at = now();
-    }
-
-    $post->save();
-
-    // Update categories
-    if (isset($data['categories'])) {
-      $post->categories()->sync($data['categories']);
-    }
-
-    return response()->json([
-      'message' => 'Post updated successfully',
-      'post' => $this->transformPost($post->load(['categories', 'featured_images', 'user']))
-    ]);
-  }
-
-  /**
-   * DELETE /api/v1/posts/{slug}
-   * Delete a blog post
-   */
-  public function destroy($slug) {
-    $post = Post::where('slug', $slug)->firstOrFail();
-    $post->delete();
-
-    return response()->json([
-      'message' => 'Post deleted successfully'
-    ], 200);
-  }
-
-  /**
    * Transform post data for API response
    */
   private function transformPost($post, $includeContent = false) {
@@ -192,7 +129,7 @@ class BlogController extends Controller {
       'slug' => $post->slug,
       'excerpt' => $post->excerpt,
       'summary' => $post->summary ?? '',
-      'published' => $post->published ?? false,
+      'published' => $post->published ? true : false,
       'published_at' => $post->published_at ? $post->published_at->toIso8601String() : null,
       'created_at' => $post->created_at->toIso8601String(),
       'updated_at' => $post->updated_at->toIso8601String(),
@@ -214,6 +151,7 @@ class BlogController extends Controller {
       'author' => $post->user ? [
         'id' => $post->user->id,
         'name' => $post->user->full_name ?? $post->user->login ?? 'Unknown',
+        'avatar' => $post->user->getAvatarThumb('full'),
       ] : null,
     ];
 
@@ -234,4 +172,3 @@ class BlogController extends Controller {
     return $data;
   }
 }
-
