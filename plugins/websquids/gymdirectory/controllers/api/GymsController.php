@@ -21,7 +21,7 @@ class GymsController extends Controller {
       ->withCount('reviews')
       ->withAvg('reviews', 'rate')
       ->filter($request->all()) // Uses the scopeFilter in your Model
-      ->paginate(10);
+      ->paginate(9);
 
     // 2. Transform Data (Add calculated rating, hide internal fields)
     $gyms->getCollection()->transform(function ($gym) {

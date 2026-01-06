@@ -37,7 +37,11 @@ class StaticPagesController extends Controller
     {
         $page = StaticPage::where('slug', $slug)
             ->where('is_published', true)
-            ->firstOrFail();
+            ->first();
+
+        if (!$page) {
+            return response()->json(['error' => 'Page not found'], 404);
+        }
 
         return [
             'id' => $page->id,
