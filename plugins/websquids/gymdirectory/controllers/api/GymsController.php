@@ -5,9 +5,9 @@ namespace Websquids\Gymdirectory\Controllers\Api;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use websquids\Gymdirectory\Models\Faq;
-use Websquids\Gymdirectory\Models\Gym;
+use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\Hour;
-use Websquids\Gymdirectory\Models\Pricing;
+use websquids\Gymdirectory\Models\Pricing;
 use websquids\Gymdirectory\Models\Review;
 
 class GymsController extends Controller {
