@@ -6,6 +6,7 @@ use Websquids\Gymdirectory\Controllers\Api\GymsController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
 use Websquids\Gymdirectory\Controllers\Api\ContactSubmissionsController;
+use Websquids\Gymdirectory\Controllers\Api\NewsletterSubscriptionsController;
 use Winter\Blog\Controllers\Api\CommentsController;
 
 Route::prefix('api/v1')
@@ -29,4 +30,7 @@ Route::prefix('api/v1')
     
     // Contact submissions routes
     Route::post('contact-submissions', [ContactSubmissionsController::class, 'store']);
+    
+    // Newsletter subscriptions routes
+    Route::post('newsletter-subscriptions', [NewsletterSubscriptionsController::class, 'store']);
   });

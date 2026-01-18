@@ -69,3 +69,6 @@
 1.0.24:
     - 'Created table websquids_gymdirectory_contact_submissions'
     - builder_table_create_websquids_gymdirectory_contact_submissions.php
+1.0.25:
+    - 'Created table websquids_gymdirectory_newsletter_subscriptions'
+    - builder_table_create_websquids_gymdirectory_newsletter_subscriptions.php

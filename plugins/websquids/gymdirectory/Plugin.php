@@ -40,6 +40,12 @@ class Plugin extends PluginBase
                         'url' => \Backend::url('websquids/gymdirectory/contactsubmissions'),
                         'permissions' => ['websquids.gymdirectory.manage_contact_submissions'],
                     ],
+                    'newslettersubscriptions' => [
+                        'label' => 'Newsletter Subscriptions',
+                        'icon' => 'icon-envelope-o',
+                        'url' => \Backend::url('websquids/gymdirectory/newslettersubscriptions'),
+                        'permissions' => ['websquids.gymdirectory.manage_newsletter_subscriptions'],
+                    ],
                 ],
             ],
         ];

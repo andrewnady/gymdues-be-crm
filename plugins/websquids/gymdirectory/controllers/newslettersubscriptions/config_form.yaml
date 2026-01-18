@@ -1,0 +1,8 @@
+name: Newsletter Subscription
+form: $/websquids/gymdirectory/models/newslettersubscription/fields.yaml
+modelClass: websquids\Gymdirectory\Models\NewsletterSubscription
+defaultRedirect: websquids/gymdirectory/newslettersubscriptions
+update:
+    redirect: websquids/gymdirectory/newslettersubscriptions
+    redirectClose: websquids/gymdirectory/newslettersubscriptions
+

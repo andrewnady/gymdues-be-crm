@@ -1,0 +1,20 @@
+fields:
+    email:
+        label: Email
+        type: text
+        disabled: true
+    is_active:
+        label: Status
+        type: switch
+        disabled: true
+    created_at:
+        label: Subscribed At
+        type: datepicker
+        mode: datetime
+        disabled: true
+    unsubscribed_at:
+        label: Unsubscribed At
+        type: datepicker
+        mode: datetime
+        disabled: true
+

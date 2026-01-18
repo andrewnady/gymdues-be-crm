@@ -1,0 +1,21 @@
+columns:
+    id:
+        label: ID
+        type: number
+        searchable: true
+    email:
+        label: Email
+        type: text
+        searchable: true
+    is_active:
+        label: Status
+        type: switch
+    created_at:
+        label: Subscribed
+        type: datetime
+        searchable: true
+    unsubscribed_at:
+        label: Unsubscribed
+        type: datetime
+        searchable: true
+
