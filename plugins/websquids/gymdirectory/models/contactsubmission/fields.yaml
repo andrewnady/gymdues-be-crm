@@ -1,0 +1,29 @@
+fields:
+    name:
+        label: Name
+        type: text
+        disabled: true
+    email:
+        label: Email
+        type: text
+        disabled: true
+    subject:
+        label: Subject
+        type: text
+        disabled: true
+    message:
+        label: Message
+        type: textarea
+        disabled: true
+        size: large
+    read_at:
+        label: Read At
+        type: datepicker
+        mode: datetime
+        disabled: true
+    created_at:
+        label: Submitted At
+        type: datepicker
+        mode: datetime
+        disabled: true
+

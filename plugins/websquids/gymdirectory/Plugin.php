@@ -34,6 +34,12 @@ class Plugin extends PluginBase
                         'url' => \Backend::url('websquids/gymdirectory/staticpages'),
                         'permissions' => ['websquids.gymdirectory.manage_static_pages'],
                     ],
+                    'contactsubmissions' => [
+                        'label' => 'Contact Submissions',
+                        'icon' => 'icon-envelope',
+                        'url' => \Backend::url('websquids/gymdirectory/contactsubmissions'),
+                        'permissions' => ['websquids.gymdirectory.manage_contact_submissions'],
+                    ],
                 ],
             ],
         ];

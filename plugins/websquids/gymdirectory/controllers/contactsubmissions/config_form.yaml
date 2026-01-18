@@ -1,0 +1,8 @@
+name: Contact Submission
+form: $/websquids/gymdirectory/models/contactsubmission/fields.yaml
+modelClass: websquids\Gymdirectory\Models\ContactSubmission
+defaultRedirect: websquids/gymdirectory/contactsubmissions
+update:
+    redirect: websquids/gymdirectory/contactsubmissions
+    redirectClose: websquids/gymdirectory/contactsubmissions
+

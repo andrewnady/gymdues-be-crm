@@ -5,6 +5,7 @@ use websquids\Gymdirectory\Classes\ApiKeyMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
+use Websquids\Gymdirectory\Controllers\Api\ContactSubmissionsController;
 use Winter\Blog\Controllers\Api\CommentsController;
 
 Route::prefix('api/v1')
@@ -25,4 +26,7 @@ Route::prefix('api/v1')
     // Blog comments routes
     Route::get('posts/{slug}/comments', [CommentsController::class, 'index']);
     Route::post('posts/{slug}/comments', [CommentsController::class, 'store']);
+    
+    // Contact submissions routes
+    Route::post('contact-submissions', [ContactSubmissionsController::class, 'store']);
   });

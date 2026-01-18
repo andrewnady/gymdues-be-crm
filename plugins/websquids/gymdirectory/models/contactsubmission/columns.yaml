@@ -1,0 +1,29 @@
+columns:
+    id:
+        label: ID
+        type: number
+        searchable: true
+    name:
+        label: Name
+        type: text
+        searchable: true
+    email:
+        label: Email
+        type: text
+        searchable: true
+    subject:
+        label: Subject
+        type: text
+        searchable: true
+    message:
+        label: Message
+        type: text
+        searchable: true
+    is_read:
+        label: Read
+        type: switch
+    created_at:
+        label: Submitted
+        type: datetime
+        searchable: true
+
