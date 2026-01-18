@@ -17,11 +17,12 @@ class GymsController extends Controller {
    */
   public function index(Request $request) {
     // 1. Query & Filter
+    $perPage = $request->input('per_page', 12); // Default to 12, but allow override
     $gyms = Gym::with(['logo', 'gallery'])
       ->withCount('reviews')
       ->withAvg('reviews', 'rate')
       ->filter($request->all()) // Uses the scopeFilter in your Model
-      ->paginate(9);
+      ->paginate($perPage);
 
     // 2. Transform Data (Add calculated rating, hide internal fields)
     $gyms->getCollection()->transform(function ($gym) {
