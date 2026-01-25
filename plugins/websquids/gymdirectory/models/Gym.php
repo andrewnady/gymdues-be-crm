@@ -48,6 +48,14 @@ class Gym extends Model {
             Faq::class,
             'key' => 'gym_id'
         ],
+        'addresses' => [
+            Address::class,
+            'key' => 'gym_id'
+        ],
+        'contacts' => [
+            Contact::class,
+            'key' => 'gym_id'
+        ],
     ];
 
     /**
@@ -57,6 +65,7 @@ class Gym extends Model {
 
     public $attachOne = [
         'logo' => \System\Models\File::class,
+        'featured_image' => \System\Models\File::class,
     ];
 
     public $attachMany = [

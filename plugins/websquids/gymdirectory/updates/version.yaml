@@ -72,3 +72,18 @@
 1.0.25:
     - 'Created table websquids_gymdirectory_newsletter_subscriptions'
     - builder_table_create_websquids_gymdirectory_newsletter_subscriptions.php
+1.0.26:
+    - 'Updated table websquids_gymdirectory_gyms'
+    - builder_table_update_websquids_gymdirectory_gyms_9.php
+1.0.27:
+    - 'Created table websquids_gymdirectory_contacts'
+    - builder_table_create_websquids_gymdirectory_contacts.php
+1.0.28:
+    - 'Created table websquids_gymdirectory_addresses'
+    - builder_table_create_websquids_gymdirectory_addresses.php
+1.0.29:
+    - 'Updated table websquids_gymdirectory_reviews'
+    - builder_table_update_websquids_gymdirectory_reviews_3.php
+1.0.30:
+    - 'Updated table websquids_gymdirectory_reviews'
+    - builder_table_update_websquids_gymdirectory_reviews_4.php
