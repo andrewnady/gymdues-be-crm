@@ -1,6 +1,7 @@
 <?php namespace websquids\Gymdirectory\Models;
 
 use Model;
+use websquids\Gymdirectory\Models\Address;
 
 /**
  * Model
@@ -26,9 +27,9 @@ class Review extends Model
     ];
 
     public $belongsTo = [
-        'gym' => [
-            Gym::class,
-            'key' => 'gym_id'
+        'address' => [
+            Address::class,
+            'key' => 'address_id'
         ],
     ];
     
@@ -36,4 +37,24 @@ class Review extends Model
      * @var array Attribute names to encode and decode using JSON.
      */
     public $jsonable = ['photos'];
+
+    /**
+     * Before save hook to ensure address_id is set correctly
+     * If address_id matches a gym_id (incorrect), find the primary address for that gym
+     */
+    public function beforeSave()
+    {
+        // If address_id is set and it matches a gym_id, we need to correct it
+        if ($this->address_id && $this->isDirty('address_id')) {
+            // Check if this address_id actually belongs to a gym (not an address)
+            $gym = \websquids\Gymdirectory\Models\Gym::find($this->address_id);
+            if ($gym) {
+                // This is a gym_id, not an address_id - get the primary address instead
+                $primaryAddress = $gym->getPrimaryAddress();
+                if ($primaryAddress) {
+                    $this->address_id = $primaryAddress->id;
+                }
+            }
+        }
+    }
 }

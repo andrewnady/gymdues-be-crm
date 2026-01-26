@@ -1,0 +1,20 @@
+/* Gym Directory Plugin Styles */
+
+/* Image columns with object-fit */
+.list-cell-type-image img {
+    object-fit: cover;
+    object-position: center;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Specific styling for gym list images */
+.list-cell-name-logo img,
+.list-cell-name-featured_image img {
+    object-fit: cover;
+    object-position: center;
+    border-radius: 4px;
+    max-width: 50px;
+    max-height: 50px;
+}

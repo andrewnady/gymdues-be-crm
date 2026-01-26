@@ -1,6 +1,10 @@
 <?php namespace websquids\Gymdirectory\Models;
 
 use Model;
+use websquids\Gymdirectory\Models\Contact;
+use websquids\Gymdirectory\Models\Review;
+use websquids\Gymdirectory\Models\Hour;
+use websquids\Gymdirectory\Models\Pricing;
 
 /**
  * Address Model
@@ -34,11 +38,31 @@ class Address extends Model
             Contact::class,
             'key' => 'address_id'
         ],
+        'reviews' => [
+            Review::class,
+            'key' => 'address_id'
+        ],
+        'hours' => [
+            Hour::class,
+            'key' => 'address_id'
+        ],
+        'pricing' => [
+            Pricing::class,
+            'key' => 'address_id'
+        ],
     ];
 
     /**
      * @var array Attribute names to encode and decode using JSON.
      */
     public $jsonable = ['reviews_per_score'];
+
+    /**
+     * Scope to get primary address
+     */
+    public function scopePrimary($query)
+    {
+        return $query->where('is_primary', true);
+    }
 }
 

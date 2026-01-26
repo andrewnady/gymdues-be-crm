@@ -2,22 +2,21 @@ columns:
     id:
         label: id
         type: number
+    gym:
+        label: Gym
+        type: text
+        select: name
+        relation: gym
     address:
         label: Address
         type: text
         select: full_address
         relation: address
-    tier_name:
-        label: tier_name
+    type:
+        label: Type
         type: text
-    price:
-        label: price
-        type: text
-    frequency:
-        label: frequency
-        type: text
-    description:
-        label: description
+    value:
+        label: Value
         type: text
     created_at:
         label: created_at
@@ -28,3 +27,4 @@ columns:
     deleted_at:
         label: deleted_at
         type: datetime
+

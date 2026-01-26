@@ -1,0 +1,95 @@
+fields:
+    is_primary:
+        label: Primary Address
+        span: full
+        type: switch
+        comment: Mark this as the primary address for the gym
+    full_address:
+        label: Full Address
+        span: full
+        type: text
+    street:
+        label: Street
+        span: auto
+        type: text
+    city:
+        label: City
+        span: auto
+        type: text
+    state:
+        label: State
+        span: auto
+        type: text
+    postal_code:
+        label: Postal Code
+        span: auto
+        type: text
+    country:
+        label: Country
+        span: auto
+        type: text
+    latitude:
+        label: Latitude
+        span: auto
+        type: number
+        step: 0.0000001
+    longitude:
+        label: Longitude
+        span: auto
+        type: number
+        step: 0.0000001
+    google_id:
+        label: Google Place ID
+        span: auto
+        type: text
+    category:
+        label: Category
+        span: auto
+        type: text
+    sub_category:
+        label: Sub Category
+        span: auto
+        type: text
+    borough:
+        label: Borough
+        span: auto
+        type: text
+    timezone:
+        label: Timezone
+        span: auto
+        type: text
+    google_review_url:
+        label: Google Review URL
+        span: full
+        type: text
+    total_reviews:
+        label: Total Reviews
+        span: auto
+        type: number
+    average_rating:
+        label: Average Rating
+        span: auto
+        type: number
+        step: 0.1
+
+tabs:
+    lazy:
+        - pricing
+        - hours
+        - reviews
+    fields:
+        pricing:
+            span: full
+            path: $/websquids/gymdirectory/controllers/addresses/_relation_pricing.htm
+            type: partial
+            tab: Memberships
+        hours:
+            span: full
+            path: $/websquids/gymdirectory/controllers/addresses/_relation_hours.htm
+            type: partial
+            tab: Hours
+        reviews:
+            span: full
+            path: $/websquids/gymdirectory/controllers/addresses/_relation_reviews.htm
+            type: partial
+            tab: Reviews

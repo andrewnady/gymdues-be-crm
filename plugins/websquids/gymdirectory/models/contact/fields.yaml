@@ -1,0 +1,39 @@
+fields:
+    type:
+        label: Contact Type
+        span: auto
+        type: dropdown
+        options:
+            business_website: Business Website
+            business_phone: Business Phone
+            email: Email
+            facebook: Facebook
+            twitter: Twitter
+            instagram: Instagram
+            youtube: YouTube
+            linkedin: LinkedIn
+            contact_page: Contact Page
+        required: true
+    value:
+        label: Value
+        span: auto
+        type: text
+        comment: The contact value (URL, phone number, email, etc.)
+    gym:
+        label: Gym
+        span: auto
+        nameFrom: name
+        descriptionFrom: city
+        type: relation
+        relation: gym
+        emptyOption: '-- Select Gym --'
+    address:
+        label: Address
+        span: auto
+        nameFrom: full_address
+        descriptionFrom: city
+        type: relation
+        relation: address
+        emptyOption: '-- Select Address --'
+        comment: Select either Gym or Address (not both)
+

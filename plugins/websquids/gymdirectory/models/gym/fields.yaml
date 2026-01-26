@@ -33,6 +33,15 @@ fields:
             extension: auto
         span: full
         type: fileupload
+    featured_image:
+        label: Featured Image
+        mode: file
+        useCaption: true
+        thumbOptions:
+            mode: crop
+            extension: auto
+        span: auto
+        type: fileupload
     city:
         label: City
         span: auto
@@ -41,28 +50,37 @@ fields:
         label: State
         span: auto
         type: text
+    google_place_url:
+        label: Google Place URL
+        span: auto
+        type: text
+    business_name:
+        label: Business Name
+        span: auto
+        type: text
+    website_title:
+        label: Website SEO Title
+        span: auto
+        type: text
+    website_desc:
+        label: Website SEO Description
+        span: full
+        type: textarea
+    website_built_with:
+        label: Website Built With
+        span: auto
+        type: text
     slug:
         label: Slug
-        span: full
+        span: auto
         type: text
 tabs:
     fields:
-        pricing:
+        addresses:
             span: full
-            path: $/websquids/gymdirectory/controllers/gyms/_relation_pricing.htm
+            path: $/websquids/gymdirectory/controllers/gyms/_relation_addresses.htm
             type: partial
-            tab: Pricing
-        hours:
-            span: full
-            cssClass: ''
-            path: $/websquids/gymdirectory/controllers/gyms/_relation_hours.htm
-            type: partial
-            tab: Hours
-        reviews:
-            span: full
-            path: $/websquids/gymdirectory/controllers/gyms/_relation_reviews.htm
-            type: partial
-            tab: Reviews
+            tab: Address
         faqs:
             span: full
             path: $/websquids/gymdirectory/controllers/gyms/_relation_faqs.htm

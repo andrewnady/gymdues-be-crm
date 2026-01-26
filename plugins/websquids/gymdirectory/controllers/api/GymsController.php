@@ -4,6 +4,12 @@ namespace Websquids\Gymdirectory\Controllers\Api;
 
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+use System\Models\File as FileModel;
+use websquids\Gymdirectory\Models\Address;
+use websquids\Gymdirectory\Models\Contact;
 use websquids\Gymdirectory\Models\Faq;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\Hour;
@@ -12,163 +18,656 @@ use websquids\Gymdirectory\Models\Review;
 
 class GymsController extends Controller {
   /**
+   * Extract domain from URL
+   */
+  private function extractDomain($url) {
+    if (empty($url)) {
+      return null;
+    }
+
+    // Parse URL
+    $parsed = parse_url($url);
+    if (!isset($parsed['host'])) {
+      return null;
+    }
+
+    $host = $parsed['host'];
+
+    // Remove www. prefix
+    $host = preg_replace('/^www\./', '', $host);
+
+    return strtolower($host);
+  }
+
+  /**
+   * Find gym by domain from contacts
+   */
+  private function findGymByDomain($domain) {
+    if (empty($domain)) {
+      return null;
+    }
+
+    // Find contacts with business_website type that match the domain
+    $contacts = Contact::where('type', 'business_website')
+      ->whereNotNull('value')
+      ->where('gym_id', '!=', null)
+      ->get();
+
+    foreach ($contacts as $contact) {
+      $contactDomain = $this->extractDomain($contact->value);
+      if ($contactDomain === $domain) {
+        return Gym::find($contact->gym_id);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Find or create address by lat/long
+   */
+  private function findOrCreateAddress($gym, $addressData) {
+    if (empty($addressData['latitude']) || empty($addressData['longitude'])) {
+      return null;
+    }
+
+    $lat = (float)$addressData['latitude'];
+    $lng = (float)$addressData['longitude'];
+    $tolerance = 0.0001; // Small tolerance for floating point comparison
+
+    // Find existing address with similar lat/long
+    $existingAddress = Address::where('gym_id', $gym->id)
+      ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+      ->whereBetween('longitude', [$lng - $tolerance, $lng + $tolerance])
+      ->first();
+
+    if ($existingAddress) {
+      return $existingAddress;
+    }
+
+    // Check if this is the first address for the gym
+    $isFirstAddress = $gym->addresses()->count() === 0;
+
+    // Create new address
+    $address = new Address;
+    $address->gym_id = $gym->id;
+    $address->google_id = $addressData['google_id'] ?? null;
+    $address->category = $addressData['category'] ?? null;
+    $address->sub_category = $addressData['sub_category'] ?? null;
+    $address->full_address = $addressData['full_address'] ?? null;
+    $address->borough = $addressData['borough'] ?? null;
+    $address->street = $addressData['street'] ?? null;
+    $address->city = $addressData['city'] ?? null;
+    $address->postal_code = $addressData['postal_code'] ?? null;
+    $address->state = $addressData['state'] ?? null;
+    $address->country = $addressData['country'] ?? null;
+    $address->timezone = $addressData['timezone'] ?? null;
+    $address->latitude = $lat;
+    $address->longitude = $lng;
+    $address->google_review_url = $addressData['google_review_url'] ?? null;
+    $address->total_reviews = $addressData['total_reviews'] ?? null;
+    $address->average_rating = $addressData['average_rating'] ?? null;
+    $address->reviews_per_score = $addressData['reviews_per_score'] ?? null;
+
+    // Set is_primary if this is the first address or explicitly set
+    $address->is_primary = $isFirstAddress || ($addressData['is_primary'] ?? false);
+
+    // If setting as primary, unset other primaries
+    if ($address->is_primary) {
+      Address::where('gym_id', $gym->id)
+        ->where('id', '!=', $address->id ?? 0)
+        ->update(['is_primary' => false]);
+    }
+
+    $address->save();
+
+    return $address;
+  }
+
+  /**
    * GET /api/v1/gyms
    * List all gyms with filters and pagination
    */
   public function index(Request $request) {
-    // 1. Query & Filter
-    $perPage = $request->input('per_page', 12); // Default to 12, but allow override
-    $gyms = Gym::with(['logo', 'gallery'])
-      ->withCount('reviews')
-      ->withAvg('reviews', 'rate')
-      ->filter($request->all()) // Uses the scopeFilter in your Model
-      ->paginate($perPage);
+    try {
+      // Get address_id from query if specified
+      $addressId = $request->input('address_id');
 
-    // 2. Transform Data (Add calculated rating, hide internal fields)
-    $gyms->getCollection()->transform(function ($gym) {
-      // Calculate Rating
-      $gym->rating = $gym->reviews_avg_rate
-        ? round((float)$gym->reviews_avg_rate, 2)
-        : 0;
+      // 1. Query & Filter
+      $perPage = $request->input('per_page', 12);
+      $gyms = Gym::with(['logo', 'gallery', 'addresses'])
+        ->filter($request->all())
+        ->paginate($perPage);
 
-      $gym->reviewCount = $gym->reviews_count ?? 0;
+      // 2. Transform Data
+      $gyms->getCollection()->transform(function ($gym) use ($addressId) {
+        // Determine target address
+        $address = null;
+        if ($addressId) {
+          $address = $gym->addresses()->where('id', $addressId)->first();
+        }
+        if (!$address) {
+          $address = $gym->getPrimaryAddress();
+        }
 
-      // Cleanup Output
-      $gym->setVisible([
-        'id',
-        'slug',
-        'trending',
-        'name',
-        'description',
-        'city',
-        'state',
-        'rating',
-        'reviewCount',
-        'logo',
-        'gallery'
+        // Load related data for the address
+        if ($address) {
+          $reviewsCount = $address->reviews()->count();
+          $reviewsAvg = $address->reviews()->avg('rate');
+        } else {
+          $reviewsCount = 0;
+          $reviewsAvg = 0;
+        }
+
+        // Calculate Rating
+        $gym->rating = $reviewsAvg ? round((float)$reviewsAvg, 2) : 0;
+        $gym->reviewCount = $reviewsCount;
+        $gym->address = $address;
+
+        // Cleanup Output
+        $gym->setVisible([
+          'id',
+          'slug',
+          'trending',
+          'name',
+          'description',
+          'city',
+          'state',
+          'rating',
+          'reviewCount',
+          'logo',
+          'gallery',
+          'address'
+        ]);
+
+        return $gym;
+      });
+
+      return $gyms;
+    } catch (ValidationException $e) {
+      return response()->json([
+        'error' => 'Validation failed',
+        'message' => $e->getMessage(),
+        'errors' => $e->errors()
+      ], 422);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@index: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString()
       ]);
-
-      return $gym;
-    });
-
-    return $gyms;
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage()
+      ], 500);
+    }
   }
 
   /**
    * GET /api/v1/gyms/{slug}
    * Get single gym details
    */
-  public function show($slug) {
-    return Gym::with(['hours', 'reviews', 'faqs', 'pricing', 'logo', 'gallery'])
-      ->withAvg('reviews as rating', 'rate')
-      ->where('slug', $slug)
-      ->firstOrFail();
+  public function show($slug, Request $request) {
+    try {
+      // Get address_id from query if specified
+      $addressId = $request->input('address_id');
+
+      $gym = Gym::with([
+        'addresses.contacts',
+        'addresses.hours',
+        'addresses.reviews',
+        'addresses.pricing',
+        'contacts',
+        'faqs',
+        'logo',
+        'gallery'
+      ])
+        ->where('slug', $slug)
+        ->firstOrFail();
+
+      // Determine target address
+      $address = null;
+      if ($addressId) {
+        $address = $gym->addresses()->where('id', $addressId)->first();
+      }
+      if (!$address) {
+        $address = $gym->getPrimaryAddress();
+      }
+
+      // Load related data for the address
+      if ($address) {
+        $gym->hours = $address->hours;
+        $gym->reviews = $address->reviews;
+        $gym->pricing = $address->pricing;
+        $gym->rating = $address->reviews()->avg('rate') ? round((float)$address->reviews()->avg('rate'), 2) : 0;
+      } else {
+        $gym->hours = collect([]);
+        $gym->reviews = collect([]);
+        $gym->pricing = collect([]);
+        $gym->rating = 0;
+      }
+
+      $gym->address = $address;
+
+      return $gym;
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+      return response()->json([
+        'error' => 'Not found',
+        'message' => 'Gym not found'
+      ], 404);
+    } catch (ValidationException $e) {
+      return response()->json([
+        'error' => 'Validation failed',
+        'message' => $e->getMessage(),
+        'errors' => $e->errors()
+      ], 422);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@show: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString()
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage()
+      ], 500);
+    }
   }
 
   /**
    * POST /api/v1/gyms
-   * Create a new gym
+   * Create or update a gym
    */
   public function store(Request $request) {
-    // Validate gym and all related records (hours, reviews, faqs, pricing)
-    $data = $request->validate([
-      // Gym
-      'name'        => 'required|string|max:255',
-      'description' => 'nullable|string',
-      'city'        => 'required|string|max:255',
-      'state'       => 'required|string|max:255',
-      'trending'    => 'sometimes|boolean',
+    try {
+      // Handle array input
+      $inputData = $request->all();
+      $gymsData = [];
 
-      // Hours (hasMany)
-      'hours'            => 'sometimes|array',
-      'hours.*.day'      => 'required_with:hours|string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-      'hours.*.from'     => 'required_with:hours|date_format:H:i',
-      'hours.*.to'       => 'required_with:hours|date_format:H:i',
-
-      // Reviews (hasMany)
-      'reviews'              => 'sometimes|array',
-      'reviews.*.reviewer'   => 'required_with:reviews|string|max:255',
-      'reviews.*.rate'       => 'required_with:reviews|numeric|min:0|max:5',
-      'reviews.*.text'       => 'nullable|string',
-      'reviews.*.reviewed_at' => 'sometimes|date',
-
-      // FAQs (hasMany)
-      'faqs'               => 'sometimes|array',
-      'faqs.*.category'    => 'required_with:faqs|string',
-      'faqs.*.question'    => 'required_with:faqs|string',
-      'faqs.*.answer'      => 'required_with:faqs|string',
-
-      // Pricing (hasMany)
-      'pricing'               => 'sometimes|array',
-      'pricing.*.tier_name'   => 'required_with:pricing|string|max:255',
-      'pricing.*.price'       => 'required_with:pricing|numeric|min:0',
-      'pricing.*.frequency'   => 'required_with:pricing|string',
-      'pricing.*.description' => 'nullable|string',
-    ]);
-
-    // Create Gym
-    $gym = new Gym;
-    $gym->name = $data['name'];
-    $gym->description = $data['description'] ?? '';
-    $gym->city = $data['city'] ?? '';
-    $gym->state = $data['state'] ?? '';
-    $gym->trending = $data['trending'] ?? false;
-    $gym->save();
-
-    // Create Hours
-    if (!empty($data['hours']) && is_array($data['hours'])) {
-      foreach ($data['hours'] as $hourData) {
-        $hour = new Hour;
-        $hour->day = $hourData['day'] ?? 'monday';
-        $hour->from = $hourData['from'] ?? '09:00';
-        $hour->to = $hourData['to'] ?? '17:00';
-        $hour->gym_id = $gym->id;
-        $hour->save();
+      if (isset($inputData[0]) && is_array($inputData[0])) {
+        // Array of gyms
+        $gymsData = $inputData;
+      } elseif (isset($inputData['gym']) && is_array($inputData['gym'])) {
+        // Single gym object
+        $gymsData = [$inputData];
+      } else {
+        // Direct gym data
+        $gymsData = [$inputData];
       }
-    }
 
-    // Create Reviews
-    if (!empty($data['reviews']) && is_array($data['reviews'])) {
-      foreach ($data['reviews'] as $reviewData) {
-        $review = new Review;
-        $review->reviewer = $reviewData['reviewer'] ?? '';
-        $review->rate = $reviewData['rate'] ?? 0;
-        $review->text = $reviewData['text'] ?? '';
-        $review->reviewed_at = $reviewData['reviewed_at'] ?? now();
-        $review->gym_id = $gym->id;
-        $review->save();
+      $results = [];
+
+      foreach ($gymsData as $gymInput) {
+        // Handle nested structure if data is under 'gym' key
+        $requestData = $gymInput;
+        if (isset($requestData['gym']) && is_array($requestData['gym'])) {
+          $requestData = array_merge($requestData, $requestData['gym']);
+        }
+
+        // Extract domain for duplicate checking
+        // First check if domain is provided directly
+        $domain = null;
+        if (isset($requestData['domain']) && !empty($requestData['domain'])) {
+          $domain = $this->extractDomain($requestData['domain']);
+        }
+        // If not provided directly, extract from contacts
+        if (!$domain && isset($requestData['contacts']) && is_array($requestData['contacts'])) {
+          foreach ($requestData['contacts'] as $contact) {
+            if (isset($contact['type']) && $contact['type'] === 'business_website' && !empty($contact['value'])) {
+              $domain = $this->extractDomain($contact['value']);
+              break;
+            }
+          }
+        }
+
+        // Find existing gym by domain
+        $gym = null;
+        if ($domain) {
+          $gym = $this->findGymByDomain($domain);
+        }
+
+        // Validate gym and all related records using merged requestData
+        $validator = Validator::make($requestData, [
+          // Gym - after merge, these should be at top level
+          'name'        => 'required|string|max:255',
+          'description' => 'nullable',
+          'city'        => 'required|string|max:255',
+          'state'       => 'required|string|max:255',
+          'trending'    => 'sometimes|boolean',
+          'featured'    => 'sometimes|boolean',
+          'domain'      => 'nullable|string',
+          'google_place_url' => 'nullable|string',
+          'business_name' => 'nullable|string|max:255',
+          'website_built_with' => 'nullable|string',
+          'website_title' => 'nullable|string|max:255',
+          'website_desc' => 'nullable|string',
+          'logo' => 'nullable|string',
+          'featured_image' => 'nullable|string',
+
+          // Address
+          'address' => 'sometimes|array',
+          'address.latitude' => 'required_with:address|numeric',
+          'address.longitude' => 'required_with:address|numeric',
+          'address.google_id' => 'nullable|string',
+          'address.category' => 'nullable|string',
+          'address.sub_category' => 'nullable|string',
+          'address.full_address' => 'nullable|string',
+          'address.borough' => 'nullable|string',
+          'address.street' => 'nullable|string',
+          'address.city' => 'nullable|string',
+          'address.postal_code' => 'nullable|alpha_num',
+          'address.state' => 'nullable|string',
+          'address.country' => 'nullable|string',
+          'address.timezone' => 'nullable|string',
+          'address.google_review_url' => 'nullable|string',
+          'address.total_reviews' => 'nullable|integer',
+          'address.average_rating' => 'nullable|numeric',
+          'address.reviews_per_score' => 'nullable',
+          'address.is_primary' => 'nullable|boolean',
+
+          // Hours (hasMany)
+          'hours'            => 'sometimes|array',
+          'hours.*.day'      => 'required_with:hours|string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+          'hours.*.from'     => 'required_with:hours|date_format:H:i',
+          'hours.*.to'       => 'required_with:hours|date_format:H:i',
+
+          // Reviews (hasMany)
+          'reviews'              => 'sometimes|array',
+          'reviews.*.reviewer'   => 'required_with:reviews|string|max:255',
+          'reviews.*.rate'       => 'required_with:reviews|numeric|min:0|max:5',
+          'reviews.*.text'       => 'nullable|string',
+          'reviews.*.reviewed_at' => 'nullable|string',
+          'reviews.*.google_review_id' => 'nullable|string',
+          'reviews.*.reviewer_name' => 'nullable|string|max:255',
+          'reviews.*.is_local_guide' => 'nullable|boolean',
+          'reviews.*.reviews_amount' => 'nullable|integer',
+          'reviews.*.photos_amount' => 'nullable|integer',
+          'reviews.*.reviewer_link' => 'nullable|string',
+          'reviews.*.rating' => 'nullable|integer|min:0|max:5',
+          'reviews.*.date' => 'nullable|date',
+          'reviews.*.photos' => 'nullable|string',
+
+          // FAQs (hasMany)
+          'faqs'               => 'sometimes|array',
+          'faqs.*.category'    => 'required_with:faqs|string',
+          'faqs.*.question'    => 'required_with:faqs|string',
+          'faqs.*.answer'      => 'required_with:faqs|string',
+
+          // Pricing (hasMany)
+          'pricing'               => 'sometimes|array',
+          'pricing.*.tier_name'   => 'required_with:pricing|string|max:255',
+          'pricing.*.price'       => 'required_with:pricing|string',
+          'pricing.*.frequency'   => 'nullable|string',
+          'pricing.*.description' => 'nullable',
+
+          // Contacts
+          'contacts' => 'sometimes|array',
+          'contacts.*.type' => 'required_with:contacts|in:business_website,business_phone,email,facebook,twitter,instagram,youtube,linkedin,contact_page',
+          'contacts.*.value' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+          throw new ValidationException($validator);
+        }
+
+        $data = $validator->validated();
+
+        // Ensure we get values from merged data (handle both nested and flat)
+        $name = $data['name'] ?? ($requestData['gym']['name'] ?? null);
+        $city = $data['city'] ?? ($requestData['gym']['city'] ?? null);
+        $state = $data['state'] ?? ($requestData['gym']['state'] ?? null);
+        $description = $data['description'] ?? ($requestData['gym']['description'] ?? '');
+
+        // Update or create gym
+        if ($gym) {
+          // Update existing gym
+          $gym->name = $name;
+          // Handle description - convert array to string if needed
+          if (is_array($description)) {
+            $description = !empty($description) ? implode(' ', $description) : '';
+          }
+          $gym->description = is_string($description) ? $description : '';
+          $gym->city = $city;
+          $gym->state = $state;
+          // Handle featured/trending - featured takes precedence
+          $gym->trending = isset($data['featured']) ? $data['featured'] : ($data['trending'] ?? false);
+          $gym->google_place_url = $data['google_place_url'] ?? null;
+          $gym->business_name = $data['business_name'] ?? null;
+          $gym->website_built_with = $data['website_built_with'] ?? null;
+          $gym->website_title = $data['website_title'] ?? null;
+          $gym->website_desc = $data['website_desc'] ?? null;
+          $gym->save();
+        } else {
+          // Create new gym
+          $gym = new Gym;
+          $gym->name = $name;
+          // Handle description - convert array to string if needed
+          if (is_array($description)) {
+            $description = !empty($description) ? implode(' ', $description) : '';
+          }
+          $gym->description = is_string($description) ? $description : '';
+          $gym->city = $city;
+          $gym->state = $state;
+          // Handle featured/trending - featured takes precedence
+          $gym->trending = isset($data['featured']) ? $data['featured'] : ($data['trending'] ?? false);
+          $gym->google_place_url = $data['google_place_url'] ?? null;
+          $gym->business_name = $data['business_name'] ?? null;
+          $gym->website_built_with = $data['website_built_with'] ?? null;
+          $gym->website_title = $data['website_title'] ?? null;
+          $gym->website_desc = $data['website_desc'] ?? null;
+          $gym->save();
+        }
+
+        // Download and attach logo if URL provided
+        if (!empty($data['logo']) && filter_var($data['logo'], FILTER_VALIDATE_URL)) {
+          try {
+            $logoFile = new FileModel;
+            $logoFile->fromUrl($data['logo']);
+            $logoFile->is_public = true;
+            $logoFile->save();
+            $gym->logo()->add($logoFile);
+          } catch (\Exception $e) {
+            Log::error('Failed to download logo: ' . $e->getMessage());
+          }
+        }
+
+        // Download and attach featured_image if URL provided
+        if (!empty($data['featured_image']) && filter_var($data['featured_image'], FILTER_VALIDATE_URL)) {
+          try {
+            // Download for featured_image
+            $featuredFile = new FileModel;
+            $featuredFile->fromUrl($data['featured_image']);
+            $featuredFile->is_public = true;
+            $featuredFile->save();
+            $gym->featured_image()->add($featuredFile);
+
+            // Download again for gallery
+            $galleryFile = new FileModel;
+            $galleryFile->fromUrl($data['featured_image']);
+            $galleryFile->is_public = true;
+            $galleryFile->save();
+            $gym->gallery()->add($galleryFile);
+          } catch (\Exception $e) {
+            Log::error('Failed to download featured image: ' . $e->getMessage());
+          }
+        }
+
+        // Extract hours, reviews, pricing data - check both merged data and nested structure
+        $hoursData = $data['hours'] ?? ($requestData['gym']['hours'] ?? ($requestData['hours'] ?? null));
+        $reviewsData = $data['reviews'] ?? ($requestData['gym']['reviews'] ?? ($requestData['reviews'] ?? null));
+        $pricingData = $data['pricing'] ?? ($requestData['gym']['pricing'] ?? ($requestData['pricing'] ?? null));
+
+        // Handle address - check both merged data and nested structure
+        $address = null;
+        $addressData = $data['address'] ?? ($requestData['gym']['address'] ?? ($requestData['address'] ?? null));
+
+        if (!empty($addressData) && is_array($addressData)) {
+          $address = $this->findOrCreateAddress($gym, $addressData);
+        }
+
+        // If hours/reviews are provided but no address exists, create a default address
+        if (!$address && (!empty($hoursData) || !empty($reviewsData) || !empty($pricingData))) {
+          // Create a minimal address using gym's city/state
+          $addressData = [
+            'latitude' => 0,
+            'longitude' => 0,
+            'city' => $city,
+            'state' => $state,
+            'full_address' => $city . ', ' . $state,
+            'is_primary' => true
+          ];
+          $address = $this->findOrCreateAddress($gym, $addressData);
+        }
+
+        // Create or Update Hours (linked to address)
+        if (!empty($hoursData) && is_array($hoursData) && $address) {
+          foreach ($hoursData as $hourData) {
+            $day = $hourData['day'] ?? 'monday';
+            
+            // Check if hour already exists for this address and day
+            $hour = Hour::where('address_id', $address->id)
+              ->where('day', $day)
+              ->first();
+            
+            if (!$hour) {
+              $hour = new Hour;
+              $hour->address_id = $address->id;
+              $hour->day = $day;
+            }
+            
+            $hour->from = $hourData['from'] ?? '09:00';
+            $hour->to = $hourData['to'] ?? '17:00';
+            $hour->save();
+          }
+        }
+
+        // Create Reviews (linked to address)
+        if (!empty($reviewsData) && is_array($reviewsData) && $address) {
+          foreach ($reviewsData as $reviewData) {
+            $review = new Review;
+            $review->reviewer = $reviewData['reviewer'] ?? '';
+            $review->rate = $reviewData['rate'] ?? 0;
+            $review->text = $reviewData['text'] ?? '';
+            $review->reviewed_at = $reviewData['reviewed_at'] ?? null;
+            $review->google_review_id = $reviewData['google_review_id'] ?? null;
+            $review->reviewer_name = $reviewData['reviewer_name'] ?? null;
+            $review->is_local_guide = $reviewData['is_local_guide'] ?? false;
+            $review->reviews_amount = $reviewData['reviews_amount'] ?? null;
+            $review->photos_amount = $reviewData['photos_amount'] ?? null;
+            $review->reviewer_link = $reviewData['reviewer_link'] ?? null;
+            $review->rating = $reviewData['rating'] ?? null;
+            $review->date = $reviewData['date'] ?? null;
+            // Handle photos as JSON string
+            $photos = $reviewData['photos'] ?? null;
+            if ($photos !== null) {
+              if (is_string($photos)) {
+                $decoded = json_decode($photos, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                  $review->photos = $decoded;
+                } else {
+                  $review->photos = [];
+                }
+              } elseif (is_array($photos)) {
+                $review->photos = $photos;
+              } else {
+                $review->photos = [];
+              }
+            } else {
+              $review->photos = null;
+            }
+            $review->address_id = $address->id;
+            $review->save();
+          }
+        }
+
+        // Create FAQs (still linked to gym)
+        if (!empty($data['faqs']) && is_array($data['faqs'])) {
+          foreach ($data['faqs'] as $faqData) {
+            $faq = new Faq;
+            $faq->category = $faqData['category'] ?? 'general';
+            $faq->question = $faqData['question'] ?? '';
+            $faq->answer = $faqData['answer'] ?? '';
+            $faq->gym_id = $gym->id;
+            $faq->save();
+          }
+        }
+
+        // Create Pricing Tiers (linked to address)
+        if (!empty($pricingData) && is_array($pricingData) && $address) {
+          foreach ($pricingData as $tier) {
+            $price = new Pricing;
+            $price->tier_name = $tier['tier_name'] ?? 'Standard';
+            $price->price = $tier['price'] ?? '0';
+            // Handle frequency - use default if empty or just whitespace
+            $frequency = isset($tier['frequency']) ? trim($tier['frequency']) : '';
+            $price->frequency = !empty($frequency) ? $frequency : 'month';
+            // Handle description - convert array to string if needed
+            $description = $tier['description'] ?? '';
+            if (is_array($description)) {
+              $description = !empty($description) ? implode(' ', $description) : '';
+            }
+            $price->description = is_string($description) ? $description : '';
+            $price->address_id = $address->id;
+            $price->save();
+          }
+        }
+
+        // Create Contacts (linked to gym)
+        // First, create business_website contact from domain if provided
+        if ($domain && !empty($requestData['domain'])) {
+          // Check if contact already exists
+          $existingContact = Contact::where('gym_id', $gym->id)
+            ->where('type', 'business_website')
+            ->where('value', $requestData['domain'])
+            ->first();
+
+          if (!$existingContact) {
+            $contact = new Contact;
+            $contact->type = 'business_website';
+            $contact->value = $requestData['domain'];
+            $contact->gym_id = $gym->id;
+            $contact->save();
+          }
+        }
+
+        // Create other contacts
+        if (!empty($data['contacts']) && is_array($data['contacts'])) {
+          foreach ($data['contacts'] as $contactData) {
+            // Skip business_website if we already created it from domain
+            if ($contactData['type'] === 'business_website' && $domain && !empty($requestData['domain'])) {
+              continue;
+            }
+
+            $contact = new Contact;
+            $contact->type = $contactData['type'];
+            $contact->value = $contactData['value'] ?? null;
+            $contact->gym_id = $gym->id;
+            $contact->save();
+          }
+        }
+
+        $results[] = [
+          'message' => $gym->wasRecentlyCreated ? 'Gym Created Successfully' : 'Gym Updated Successfully',
+          'id' => $gym->id,
+          'slug' => $gym->slug
+        ];
       }
-    }
 
-    // Create FAQs
-    if (!empty($data['faqs']) && is_array($data['faqs'])) {
-      foreach ($data['faqs'] as $faqData) {
-        $faq = new Faq;
-        $faq->category = $faqData['category'] ?? 'general';
-        $faq->question = $faqData['question'] ?? '';
-        $faq->answer = $faqData['answer'] ?? '';
-        $faq->gym_id = $gym->id;
-        $faq->save();
-      }
+      return response()->json(
+        count($results) === 1 ? $results[0] : $results,
+        count($results) === 1 && isset($results[0]['message']) && strpos($results[0]['message'], 'Created') !== false ? 201 : 200
+      );
+    } catch (ValidationException $e) {
+      return response()->json([
+        'error' => 'Validation failed',
+        'message' => $e->getMessage(),
+        'errors' => $e->errors()
+      ], 422);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@store: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+        'request_data' => $request->all()
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage()
+      ], 500);
     }
-
-    // Create Pricing Tiers
-    if (!empty($data['pricing']) && is_array($data['pricing'])) {
-      foreach ($data['pricing'] as $tier) {
-        $price = new Pricing;
-        $price->tier_name = $tier['tier_name'] ?? 'Standard';
-        $price->price = $tier['price'] ?? '0';
-        $price->frequency = $tier['frequency'] ?? 'month';
-        $price->description = $tier['description'] ?? '';
-        $price->gym_id = $gym->id;
-        $price->save();
-      }
-    }
-
-    return response()->json([
-      'message' => 'Gym Created Successfully',
-      'id' => $gym->id,
-      'slug' => $gym->slug
-    ], 201);
   }
 }

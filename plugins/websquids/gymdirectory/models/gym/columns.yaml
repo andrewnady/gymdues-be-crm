@@ -12,8 +12,19 @@ columns:
     logo:
         label: Logo
         type: image
+    featured_image:
+        label: Featured Image
+        type: image
     trending:
         label: Trending
         type: switch
         searchable: true
+        sortable: true
+    city:
+        label: City
+        type: text
+        sortable: true
+    state:
+        label: State
+        type: text
         sortable: true

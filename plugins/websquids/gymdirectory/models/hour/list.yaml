@@ -7,18 +7,15 @@ columns:
         type: text
         select: full_address
         relation: address
-    tier_name:
-        label: tier_name
+    day:
+        label: day
         type: text
-    price:
-        label: price
-        type: text
-    frequency:
-        label: frequency
-        type: text
-    description:
-        label: description
-        type: text
+    from:
+        label: from
+        type: time
+    to:
+        label: to
+        type: time
     created_at:
         label: created_at
         type: datetime
@@ -28,3 +25,4 @@ columns:
     deleted_at:
         label: deleted_at
         type: datetime
+

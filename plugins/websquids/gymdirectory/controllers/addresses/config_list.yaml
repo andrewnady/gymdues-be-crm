@@ -1,0 +1,13 @@
+list: $/websquids/gymdirectory/models/address/columns.yaml
+modelClass: websquids\Gymdirectory\Models\Address
+title: Addresses
+noRecordsMessage: 'backend::lang.list.no_records'
+showSetup: true
+showCheckboxes: true
+recordsPerPage: 20
+toolbar:
+    buttons: list_toolbar
+    search:
+        prompt: 'backend::lang.list.search_prompt'
+recordUrl: 'websquids/gymdirectory/addresses/update/:id'
+

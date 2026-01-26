@@ -2,11 +2,11 @@ columns:
     id:
         label: id
         type: number
-    gym:
-        label: Gym
+    address:
+        label: Address
         type: text
-        select: name
-        relation: gym
+        select: full_address
+        relation: address
     reviewer:
         label: reviewer
         type: text

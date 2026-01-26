@@ -87,3 +87,18 @@
 1.0.30:
     - 'Updated table websquids_gymdirectory_reviews'
     - builder_table_update_websquids_gymdirectory_reviews_4.php
+1.0.31:
+    - 'Updated table websquids_gymdirectory_pricing'
+    - builder_table_update_websquids_gymdirectory_pricing_5.php
+1.0.32:
+    - 'Updated table websquids_gymdirectory_reviews - add address_id, remove gym_id'
+    - builder_table_update_websquids_gymdirectory_reviews_5.php
+1.0.33:
+    - 'Updated table websquids_gymdirectory_hours - add address_id, remove gym_id'
+    - builder_table_update_websquids_gymdirectory_hours_2.php
+1.0.34:
+    - 'Updated table websquids_gymdirectory_pricing - add address_id, remove gym_id'
+    - builder_table_update_websquids_gymdirectory_pricing_6.php
+1.0.35:
+    - 'Updated table websquids_gymdirectory_addresses - add is_primary field'
+    - builder_table_update_websquids_gymdirectory_addresses_2.php

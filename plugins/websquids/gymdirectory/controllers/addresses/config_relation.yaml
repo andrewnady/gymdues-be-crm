@@ -2,14 +2,6 @@
 #  Relation Behavior Config
 # ===================================
 
-addresses:
-    label: Addresses
-    view:
-        list: $/websquids/gymdirectory/models/address/columns.yaml
-        toolbarButtons: create|delete
-    manage:
-        form: $/websquids/gymdirectory/models/address/fields.yaml
-
 pricing:
     label: Pricing Tiers
     view:
@@ -34,10 +26,3 @@ reviews:
     manage:
         form: $/websquids/gymdirectory/models/review/fields.yaml
 
-faqs:
-    label: FAQs
-    view:
-        list: $/websquids/gymdirectory/models/faq/columns.yaml
-        toolbarButtons: create|delete
-    manage:
-        form: $/websquids/gymdirectory/models/faq/fields.yaml

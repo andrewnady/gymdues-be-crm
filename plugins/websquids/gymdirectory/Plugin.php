@@ -12,6 +12,7 @@ class Plugin extends PluginBase
     {
     }
 
+
     public function registerNavigation()
     {
         return [

@@ -1,0 +1,20 @@
+columns:
+    full_address:
+        label: Full Address
+        type: text
+    city:
+        label: City
+        type: text
+    state:
+        label: State
+        type: text
+    is_primary:
+        label: Primary
+        type: switch
+    latitude:
+        label: Latitude
+        type: number
+    longitude:
+        label: Longitude
+        type: number
+

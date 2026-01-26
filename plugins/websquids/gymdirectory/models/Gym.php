@@ -32,18 +32,6 @@ class Gym extends Model {
     public $rules = [];
 
     public $hasMany = [
-        'pricing' => [
-            Pricing::class,
-            'key' => 'gym_id'
-        ],
-        'hours' => [
-            Hour::class,
-            'key' => 'gym_id'
-        ],
-        'reviews' => [
-            Review::class,
-            'key' => 'gym_id'
-        ],
         'faqs' => [
             Faq::class,
             'key' => 'gym_id'
@@ -126,5 +114,63 @@ class Gym extends Model {
         }
 
         return $query;
+    }
+
+    /**
+     * Get the primary address for this gym
+     * @return Address|null
+     */
+    public function getPrimaryAddress()
+    {
+        // First try to get address with is_primary = true
+        $primary = $this->addresses()->where('is_primary', true)->first();
+        
+        // If no primary, get the first address (by id)
+        if (!$primary) {
+            $primary = $this->addresses()->orderBy('id', 'asc')->first();
+        }
+        
+        return $primary;
+    }
+
+    /**
+     * Override pricing relationship to filter by primary address
+     * Creates a hasMany relationship from Gym that filters by primary address ID
+     * This ensures the parent model is Gym (as RelationController expects) while filtering results
+     */
+    public function pricing()
+    {
+        $primaryAddress = $this->getPrimaryAddress();
+        $addressId = $primaryAddress ? $primaryAddress->id : -1; // Use -1 if no address (will return empty)
+        
+        // Create relationship with Gym as parent, filtered by primary address
+        return $this->hasMany(Pricing::class, 'address_id')
+            ->where('address_id', $addressId);
+    }
+
+    /**
+     * Override hours relationship to filter by primary address
+     * Creates a hasMany relationship from Gym that filters by primary address ID
+     */
+    public function hours()
+    {
+        $primaryAddress = $this->getPrimaryAddress();
+        $addressId = $primaryAddress ? $primaryAddress->id : -1;
+        
+        return $this->hasMany(Hour::class, 'address_id')
+            ->where('address_id', $addressId);
+    }
+
+    /**
+     * Override reviews relationship to filter by primary address
+     * Creates a hasMany relationship from Gym that filters by primary address ID
+     */
+    public function reviews()
+    {
+        $primaryAddress = $this->getPrimaryAddress();
+        $addressId = $primaryAddress ? $primaryAddress->id : -1;
+        
+        return $this->hasMany(Review::class, 'address_id')
+            ->where('address_id', $addressId);
     }
 }
