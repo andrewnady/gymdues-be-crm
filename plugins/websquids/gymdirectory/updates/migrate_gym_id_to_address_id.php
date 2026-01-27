@@ -85,40 +85,67 @@ class MigrateGymIdToAddressId extends Migration
         $hours = Hour::all();
         
         foreach ($hours as $hour) {
+            $targetAddressId = null;
+            
             // If address_id is null, try to find gym from address relationship
             if (!$hour->address_id) {
                 $address = $hour->address;
                 if ($address && $address->gym) {
                     $primaryAddress = $address->gym->getPrimaryAddress();
                     if ($primaryAddress) {
-                        $hour->address_id = $primaryAddress->id;
-                        $hour->save();
-                    }
-                }
-                continue;
-            }
-            
-            $gym = Gym::find($hour->address_id);
-            
-            if ($gym) {
-                $primaryAddress = $gym->getPrimaryAddress();
-                
-                if ($primaryAddress) {
-                    $hour->address_id = $primaryAddress->id;
-                    $hour->save();
-                } else {
-                    $address = $this->createAddressFromGym($gym);
-                    if ($address) {
-                        $hour->address_id = $address->id;
-                        $hour->save();
+                        $targetAddressId = $primaryAddress->id;
                     }
                 }
             } else {
-                $address = Address::find($hour->address_id);
-                if (!$address) {
-                    $hour->address_id = null;
+                $gym = Gym::find($hour->address_id);
+                
+                if ($gym) {
+                    $primaryAddress = $gym->getPrimaryAddress();
+                    
+                    if ($primaryAddress) {
+                        $targetAddressId = $primaryAddress->id;
+                    } else {
+                        $address = $this->createAddressFromGym($gym);
+                        if ($address) {
+                            $targetAddressId = $address->id;
+                        }
+                    }
+                } else {
+                    $address = Address::find($hour->address_id);
+                    if ($address) {
+                        $targetAddressId = $hour->address_id; // Already correct
+                    }
+                }
+            }
+            
+            // If we have a target address, check for duplicates before updating
+            if ($targetAddressId) {
+                // Check if an hour already exists for this address and day
+                $existingHour = Hour::where('address_id', $targetAddressId)
+                    ->where('day', $hour->day)
+                    ->where('id', '!=', $hour->id)
+                    ->first();
+                
+                if ($existingHour) {
+                    // Duplicate exists - keep the existing one, delete this duplicate
+                    // Or merge: keep the one with more complete data
+                    if ($hour->from && $hour->to && (!$existingHour->from || !$existingHour->to)) {
+                        // This hour has more complete data, update the existing one
+                        $existingHour->from = $hour->from;
+                        $existingHour->to = $hour->to;
+                        $existingHour->save();
+                    }
+                    // Delete the duplicate
+                    $hour->delete();
+                } else {
+                    // No duplicate, safe to update
+                    $hour->address_id = $targetAddressId;
                     $hour->save();
                 }
+            } else {
+                // No valid address found, set to null
+                $hour->address_id = null;
+                $hour->save();
             }
         }
     }
