@@ -1,6 +1,7 @@
 <?php namespace websquids\Gymdirectory\Updates;
 
 use Schema;
+use Illuminate\Support\Facades\DB;
 use Winter\Storm\Database\Updates\Migration;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\Address;
@@ -83,7 +84,9 @@ class MigrateGymIdToAddressId extends Migration
     private function migrateHours()
     {
         $hours = Hour::all();
+        $hourMappings = []; // Store hour_id => target_address_id mapping
         
+        // First pass: determine target address for each hour
         foreach ($hours as $hour) {
             $targetAddressId = null;
             
@@ -118,31 +121,78 @@ class MigrateGymIdToAddressId extends Migration
                 }
             }
             
-            // If we have a target address, check for duplicates before updating
             if ($targetAddressId) {
-                // Check if an hour already exists for this address and day
-                $existingHour = Hour::where('address_id', $targetAddressId)
-                    ->where('day', $hour->day)
+                $hourMappings[$hour->id] = [
+                    'address_id' => $targetAddressId,
+                    'day' => $hour->day,
+                    'hour' => $hour
+                ];
+            }
+        }
+        
+        // Group hours by target address_id + day to find duplicates
+        $groups = [];
+        foreach ($hourMappings as $hourId => $mapping) {
+            $key = $mapping['address_id'] . '-' . $mapping['day'];
+            if (!isset($groups[$key])) {
+                $groups[$key] = [];
+            }
+            $groups[$key][] = $mapping['hour'];
+        }
+        
+        // Process each group: keep the best hour, delete duplicates
+        foreach ($groups as $key => $groupHours) {
+            if (count($groupHours) > 1) {
+                // Multiple hours for same address+day - keep the best one
+                // Sort by completeness (hours with from/to are better)
+                usort($groupHours, function($a, $b) {
+                    $aComplete = !empty($a->from) && !empty($a->to);
+                    $bComplete = !empty($b->from) && !empty($b->to);
+                    
+                    if ($aComplete && !$bComplete) {
+                        return -1;
+                    }
+                    if (!$aComplete && $bComplete) {
+                        return 1;
+                    }
+                    
+                    // If both complete or both incomplete, keep the first one (lowest ID)
+                    return $a->id <=> $b->id;
+                });
+                
+                // Keep the first (best) one, delete the rest
+                array_shift($groupHours); // Keep first one, process the rest as duplicates
+                foreach ($groupHours as $duplicateHour) {
+                    $duplicateHour->delete();
+                    // Remove from mappings so we don't try to update it
+                    unset($hourMappings[$duplicateHour->id]);
+                }
+            }
+        }
+        
+        // Now update all remaining hours
+        foreach ($hourMappings as $hourId => $mapping) {
+            $hour = Hour::find($hourId);
+            if ($hour) {
+                // Double-check no duplicate exists (safety check)
+                $existing = Hour::where('address_id', $mapping['address_id'])
+                    ->where('day', $mapping['day'])
                     ->where('id', '!=', $hour->id)
                     ->first();
                 
-                if ($existingHour) {
-                    // Duplicate exists - keep the existing one, delete this duplicate
-                    // Or merge: keep the one with more complete data
-                    if ($hour->from && $hour->to && (!$existingHour->from || !$existingHour->to)) {
-                        // This hour has more complete data, update the existing one
-                        $existingHour->from = $hour->from;
-                        $existingHour->to = $hour->to;
-                        $existingHour->save();
-                    }
-                    // Delete the duplicate
-                    $hour->delete();
-                } else {
-                    // No duplicate, safe to update
-                    $hour->address_id = $targetAddressId;
+                if (!$existing) {
+                    $hour->address_id = $mapping['address_id'];
                     $hour->save();
+                } else {
+                    // Duplicate found (shouldn't happen, but handle it)
+                    $hour->delete();
                 }
-            } else {
+            }
+        }
+        
+        // Handle hours that didn't get a target address
+        foreach ($hours as $hour) {
+            if (!isset($hourMappings[$hour->id]) && $hour->exists) {
                 // No valid address found, set to null
                 $hour->address_id = null;
                 $hour->save();
@@ -199,7 +249,7 @@ class MigrateGymIdToAddressId extends Migration
     private function ensureGymsHaveAddresses()
     {
         // Get all unique address_ids from reviews, hours, and pricing that point to gyms (not addresses)
-        $reviewGymIds = \DB::table('websquids_gymdirectory_reviews')
+        $reviewGymIds = DB::table('websquids_gymdirectory_reviews')
             ->select('address_id')
             ->whereNotNull('address_id')
             ->whereNotIn('address_id', function($query) {
@@ -208,7 +258,7 @@ class MigrateGymIdToAddressId extends Migration
             ->pluck('address_id')
             ->unique();
         
-        $hourGymIds = \DB::table('websquids_gymdirectory_hours')
+        $hourGymIds = DB::table('websquids_gymdirectory_hours')
             ->select('address_id')
             ->whereNotNull('address_id')
             ->whereNotIn('address_id', function($query) {
@@ -217,7 +267,7 @@ class MigrateGymIdToAddressId extends Migration
             ->pluck('address_id')
             ->unique();
         
-        $pricingGymIds = \DB::table('websquids_gymdirectory_pricing')
+        $pricingGymIds = DB::table('websquids_gymdirectory_pricing')
             ->select('address_id')
             ->whereNotNull('address_id')
             ->whereNotIn('address_id', function($query) {
@@ -249,15 +299,15 @@ class MigrateGymIdToAddressId extends Migration
             }
             
             // Check if this gym ID appears as address_id in any table (meaning it's broken)
-            $hasBrokenReviews = \DB::table('websquids_gymdirectory_reviews')
+            $hasBrokenReviews = DB::table('websquids_gymdirectory_reviews')
                 ->where('address_id', $gymId)
                 ->exists();
             
-            $hasBrokenHours = \DB::table('websquids_gymdirectory_hours')
+            $hasBrokenHours = DB::table('websquids_gymdirectory_hours')
                 ->where('address_id', $gymId)
                 ->exists();
             
-            $hasBrokenPricing = \DB::table('websquids_gymdirectory_pricing')
+            $hasBrokenPricing = DB::table('websquids_gymdirectory_pricing')
                 ->where('address_id', $gymId)
                 ->exists();
             
@@ -274,24 +324,17 @@ class MigrateGymIdToAddressId extends Migration
     private function fixOrphanedRecords()
     {
         // Find reviews with null address_id and try to link them
-        $orphanedReviews = Review::whereNull('address_id')->get();
-        foreach ($orphanedReviews as $review) {
-            // Try to find gym through any relationship
-            // Since we can't determine the original gym, we'll leave these as null
-            // They can be manually fixed or re-linked through the admin panel
-        }
+        // Since we can't determine the original gym, we'll leave these as null
+        // They can be manually fixed or re-linked through the admin panel
+        Review::whereNull('address_id')->get();
         
         // Find hours with null address_id
-        $orphanedHours = Hour::whereNull('address_id')->get();
-        foreach ($orphanedHours as $hour) {
-            // Similar to reviews - can't determine original gym
-        }
+        // Similar to reviews - can't determine original gym
+        Hour::whereNull('address_id')->get();
         
         // Find pricing with null address_id
-        $orphanedPricing = Pricing::whereNull('address_id')->get();
-        foreach ($orphanedPricing as $price) {
-            // Similar to reviews - can't determine original gym
-        }
+        // Similar to reviews - can't determine original gym
+        Pricing::whereNull('address_id')->get();
     }
     
     /**
