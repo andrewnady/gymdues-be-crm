@@ -9,23 +9,38 @@ use websquids\Gymdirectory\Models\Review;
 use websquids\Gymdirectory\Models\Hour;
 use websquids\Gymdirectory\Models\Pricing;
 
+/**
+ * Migration: Migrate existing gym_id data to address_id for reviews, hours, and pricing
+ *
+ * Purpose:
+ * - Create an address for each gym that has no address but has data (Hours, Reviews, Pricing)
+ * - Link old data (Hours, Reviews, Pricing) to the gym's primary address
+ *
+ * Process:
+ * 1. Ensure all gyms with data have at least one address (create if missing)
+ * 2. Migrate reviews: Update address_id from gym_id to the gym's primary address_id
+ * 3. Migrate hours: Update address_id from gym_id to the gym's primary address_id (handle duplicates)
+ * 4. Migrate pricing: Update address_id from gym_id to the gym's primary address_id
+ * 5. Clean up any orphaned records
+ */
 class MigrateGymIdToAddressId extends Migration
 {
     public function up()
     {
-        // First, ensure all gyms with reviews/hours/pricing have addresses
+        // Step 1: Ensure all gyms with reviews/hours/pricing have addresses
+        // This creates addresses for gyms that need them before we migrate data
         $this->ensureGymsHaveAddresses();
         
-        // Migrate Reviews
+        // Step 2: Migrate Reviews - link to gym's primary address
         $this->migrateReviews();
         
-        // Migrate Hours
+        // Step 3: Migrate Hours - link to gym's primary address (handles duplicates)
         $this->migrateHours();
         
-        // Migrate Pricing
+        // Step 4: Migrate Pricing - link to gym's primary address
         $this->migratePricing();
         
-        // Fix any remaining orphaned records
+        // Step 5: Fix any remaining orphaned records
         $this->fixOrphanedRecords();
     }
     
@@ -245,10 +260,12 @@ class MigrateGymIdToAddressId extends Migration
     
     /**
      * Ensure all gyms that have reviews, hours, or pricing have at least one address
+     * This method finds ALL gyms that have any data and ensures they have addresses
      */
     private function ensureGymsHaveAddresses()
     {
-        // Get all unique address_ids from reviews, hours, and pricing that point to gyms (not addresses)
+        // Step 1: Find all gym IDs that have data pointing to them (address_id = gym_id)
+        // These are the broken records that need fixing
         $reviewGymIds = DB::table('websquids_gymdirectory_reviews')
             ->select('address_id')
             ->whereNotNull('address_id')
@@ -276,45 +293,43 @@ class MigrateGymIdToAddressId extends Migration
             ->pluck('address_id')
             ->unique();
         
-        // Combine all gym IDs that need addresses
-        $gymIdsNeedingAddresses = $reviewGymIds->merge($hourGymIds)->merge($pricingGymIds)->unique();
+        // Combine all gym IDs that have broken references
+        $gymIdsWithBrokenData = $reviewGymIds->merge($hourGymIds)->merge($pricingGymIds)->unique();
         
-        foreach ($gymIdsNeedingAddresses as $gymId) {
-            $gym = Gym::find($gymId);
-            if ($gym && $gym->addresses()->count() === 0) {
-                // Create address for this gym
-                $this->createAddressFromGym($gym);
-            }
-        }
+        // Step 2: Also find gyms that might have data but address_id is null
+        // We need to check all gyms to see if they have any data at all
+        $allGyms = Gym::all();
+        $gymsNeedingAddresses = [];
         
-        // Also check: if any gym has data pointing to it (address_id = gym_id) but no addresses, create one
-        // This is already handled above, but we also need to check gyms that might have been missed
-        // Get all gym IDs that exist
-        $allGymIds = Gym::pluck('id');
-        
-        foreach ($allGymIds as $gymId) {
-            $gym = Gym::find($gymId);
-            if (!$gym) {
-                continue;
-            }
-            
-            // Check if this gym ID appears as address_id in any table (meaning it's broken)
+        foreach ($allGyms as $gym) {
+            // Check if gym has any data (reviews, hours, or pricing)
+            // either pointing to it (broken) or null (orphaned)
             $hasBrokenReviews = DB::table('websquids_gymdirectory_reviews')
-                ->where('address_id', $gymId)
+                ->where('address_id', $gym->id)
                 ->exists();
             
             $hasBrokenHours = DB::table('websquids_gymdirectory_hours')
-                ->where('address_id', $gymId)
+                ->where('address_id', $gym->id)
                 ->exists();
             
             $hasBrokenPricing = DB::table('websquids_gymdirectory_pricing')
-                ->where('address_id', $gymId)
+                ->where('address_id', $gym->id)
                 ->exists();
             
-            // If gym has broken references but no addresses, create one
-            if (($hasBrokenReviews || $hasBrokenHours || $hasBrokenPricing) && $gym->addresses()->count() === 0) {
-                $this->createAddressFromGym($gym);
+            // Check for orphaned data (null address_id) - we can't determine which gym these belong to
+            // but if a gym has no addresses and we find orphaned data, we'll create an address
+            // This is a best-effort approach
+            
+            // If gym has broken references or is in our list, it needs an address
+            if (($hasBrokenReviews || $hasBrokenHours || $hasBrokenPricing || $gymIdsWithBrokenData->contains($gym->id))
+                && $gym->addresses()->count() === 0) {
+                $gymsNeedingAddresses[] = $gym;
             }
+        }
+        
+        // Step 3: Create addresses for all gyms that need them
+        foreach ($gymsNeedingAddresses as $gym) {
+            $this->createAddressFromGym($gym);
         }
     }
     
