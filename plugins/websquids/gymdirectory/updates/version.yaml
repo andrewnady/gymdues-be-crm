@@ -102,3 +102,6 @@
 1.0.35:
     - 'Updated table websquids_gymdirectory_addresses - add is_primary field'
     - builder_table_update_websquids_gymdirectory_addresses_2.php
+1.0.36:
+    - 'Migrate existing gym_id data to address_id for reviews, hours, and pricing'
+    - migrate_gym_id_to_address_id.php
