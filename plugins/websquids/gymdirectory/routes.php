@@ -14,6 +14,8 @@ Route::prefix('api/v1')
   ->group(function () {
     Route::get('gyms', [GymsController::class, 'index']);
     Route::post('gyms', [GymsController::class, 'store']);
+    Route::get('gyms/{gym_id}/addresses', [GymsController::class, 'addresses']);
+    Route::get('addresses/{address_id}', [GymsController::class, 'address']);
     Route::get('gyms/{slug}', [GymsController::class, 'show']);
     
     // Reviews routes

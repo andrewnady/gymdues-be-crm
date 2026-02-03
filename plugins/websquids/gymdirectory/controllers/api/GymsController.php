@@ -216,6 +216,71 @@ class GymsController extends Controller {
   }
 
   /**
+   * GET /api/v1/gyms/{gym_id}/addresses
+   * Paginated list of addresses for a gym (default 5 per page).
+   */
+  public function addresses($gym_id, Request $request) {
+    try {
+      $gym = Gym::find($gym_id);
+      if (!$gym) {
+        return response()->json([
+          'error' => 'Not found',
+          'message' => 'Gym not found',
+        ], 404);
+      }
+
+      $perPage = (int) $request->input('per_page', 500);
+      $perPage = max(1, min(500, $perPage)); // clamp between 1 and 100
+
+      $paginator = Address::where('gym_id', $gym_id)
+        ->orderByRaw('is_primary DESC')
+        ->orderBy('id')
+        ->paginate($perPage);
+
+      return response()->json($paginator);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@addresses: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
+   * GET /api/v1/addresses/{address_id}
+   * Get single address details
+   */
+  public function address($address_id, Request $request) {
+    try {
+      $address = Address::with([
+        'gym',
+        'contacts',
+        'hours',
+        'reviews',
+        'pricing'
+      ])->find($address_id);
+      if (!$address) {
+        return response()->json([
+          'error' => 'Not found',
+          'message' => 'Address not found',
+        ], 404);
+      }
+      return response()->json($address->toArray());
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@address: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
    * GET /api/v1/gyms/{slug}
    * Get single gym details
    */
