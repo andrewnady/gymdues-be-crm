@@ -64,31 +64,45 @@ class GymsController extends Controller {
   }
 
   /**
-   * Find or create address by lat/long
+   * Find or create address by lat/long for this gym.
+   * If lat/long exist: find existing address with same coords or create new one.
+   * If lat/long missing: create a new address (with 0,0 or from addressData).
    */
   private function findOrCreateAddress($gym, $addressData) {
-    if (empty($addressData['latitude']) || empty($addressData['longitude'])) {
-      return null;
+    $hasLatLong = !empty($addressData['latitude']) && !empty($addressData['longitude']);
+
+    if ($hasLatLong) {
+      $lat = (float)$addressData['latitude'];
+      $lng = (float)$addressData['longitude'];
+      $tolerance = 0.0001; // Small tolerance for floating point comparison
+
+      // Find existing address with similar lat/long for this gym
+      $existingAddress = Address::where('gym_id', $gym->id)
+        ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+        ->whereBetween('longitude', [$lng - $tolerance, $lng + $tolerance])
+        ->first();
+
+      if ($existingAddress) {
+        return $existingAddress;
+      }
     }
 
-    $lat = (float)$addressData['latitude'];
-    $lng = (float)$addressData['longitude'];
-    $tolerance = 0.0001; // Small tolerance for floating point comparison
+    // No matching address found, or lat/long not provided: create new address
+    return $this->createAddress($gym, $addressData);
+  }
 
-    // Find existing address with similar lat/long
-    $existingAddress = Address::where('gym_id', $gym->id)
-      ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
-      ->whereBetween('longitude', [$lng - $tolerance, $lng + $tolerance])
-      ->first();
-
-    if ($existingAddress) {
-      return $existingAddress;
-    }
+  /**
+   * Create a new address for the gym (used when lat/long missing or no existing match).
+   */
+  private function createAddress($gym, $addressData) {
+    $lat = isset($addressData['latitude']) && $addressData['latitude'] !== '' && $addressData['latitude'] !== null
+      ? (float)$addressData['latitude'] : 0;
+    $lng = isset($addressData['longitude']) && $addressData['longitude'] !== '' && $addressData['longitude'] !== null
+      ? (float)$addressData['longitude'] : 0;
 
     // Check if this is the first address for the gym
     $isFirstAddress = $gym->addresses()->count() === 0;
 
-    // Create new address
     $address = new Address;
     $address->gym_id = $gym->id;
     $address->google_id = $addressData['google_id'] ?? null;
@@ -211,11 +225,11 @@ class GymsController extends Controller {
       $addressId = $request->input('address_id');
 
       $gym = Gym::with([
-        'addresses.contacts',
-        'addresses.hours',
-        'addresses.reviews',
-        'addresses.pricing',
-        'contacts',
+        // 'addresses.contacts',
+        // 'addresses.hours',
+        // 'addresses.reviews',
+        // 'addresses.pricing',
+        // 'contacts',
         'faqs',
         'logo',
         'gallery'
@@ -246,8 +260,10 @@ class GymsController extends Controller {
       }
 
       $gym->address = $address;
+      $gym->addresses_count = $gym->addresses()->count();
+      $gym->contacts_count = $gym->contacts()->count();
 
-      return $gym;
+      return response()->json($gym->toArray());
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
       return response()->json([
         'error' => 'Not found',
@@ -519,18 +535,18 @@ class GymsController extends Controller {
         if (!empty($hoursData) && is_array($hoursData) && $address) {
           foreach ($hoursData as $hourData) {
             $day = $hourData['day'] ?? 'monday';
-            
+
             // Check if hour already exists for this address and day
             $hour = Hour::where('address_id', $address->id)
               ->where('day', $day)
               ->first();
-            
+
             if (!$hour) {
               $hour = new Hour;
               $hour->address_id = $address->id;
               $hour->day = $day;
             }
-            
+
             $hour->from = $hourData['from'] ?? '09:00';
             $hour->to = $hourData['to'] ?? '17:00';
             $hour->save();
@@ -626,8 +642,8 @@ class GymsController extends Controller {
           }
         }
 
-        // Create other contacts
-        if (!empty($data['contacts']) && is_array($data['contacts'])) {
+        // Create other contacts (ensure we have an address when linking contacts to it)
+        if (!empty($data['contacts']) && is_array($data['contacts']) && !$address) {
           foreach ($data['contacts'] as $contactData) {
             // Skip business_website if we already created it from domain
             if ($contactData['type'] === 'business_website' && $domain && !empty($requestData['domain'])) {
@@ -637,7 +653,7 @@ class GymsController extends Controller {
             $contact = new Contact;
             $contact->type = $contactData['type'];
             $contact->value = $contactData['value'] ?? null;
-            $contact->gym_id = $gym->id;
+            $contact->address_id = $address->id;
             $contact->save();
           }
         }

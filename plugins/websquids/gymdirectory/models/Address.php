@@ -22,6 +22,11 @@ class Address extends Model
     public $table = 'websquids_gymdirectory_addresses';
 
     /**
+     * @var array Attributes to hide from array/JSON (avoids circular ref when API returns gym with addresses)
+     */
+    protected $hidden = ['gym'];
+
+    /**
      * @var array Validation rules
      */
     public $rules = [];

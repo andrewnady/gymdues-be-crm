@@ -19,6 +19,11 @@ class Contact extends Model
     public $table = 'websquids_gymdirectory_contacts';
 
     /**
+     * @var array Attributes to hide from array/JSON (avoids circular ref in API)
+     */
+    protected $hidden = ['gym', 'address'];
+
+    /**
      * @var array Validation rules
      */
     public $rules = [

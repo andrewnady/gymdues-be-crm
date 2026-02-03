@@ -26,6 +26,11 @@ class Pricing extends Model {
      */
     public $rules = [];
 
+    /**
+     * @var array Attributes to hide from array/JSON (avoids circular ref in API)
+     */
+    protected $hidden = ['address'];
+
     public $belongsTo = [
         'address' => [
             Address::class,

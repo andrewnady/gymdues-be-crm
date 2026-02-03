@@ -27,6 +27,11 @@ class Hour extends Model {
     public $rules = [];
 
     /**
+     * @var array Attributes to hide from array/JSON (avoids circular ref in API)
+     */
+    protected $hidden = ['address'];
+
+    /**
      * @var array Attribute names to encode and decode using JSON.
      */
     public $jsonable = [];
