@@ -216,6 +216,52 @@ class GymsController extends Controller {
   }
 
   /**
+   * GET /api/v1/gyms/states
+   * Distinct states from gyms table with counts (for state filter autocomplete).
+   */
+  public function states(Request $request) {
+    try {
+      $stateNames = [
+        'AL' => 'Alabama', 'AK' => 'Alaska', 'AZ' => 'Arizona', 'AR' => 'Arkansas',
+        'CA' => 'California', 'CO' => 'Colorado', 'CT' => 'Connecticut', 'DE' => 'Delaware',
+        'FL' => 'Florida', 'GA' => 'Georgia', 'HI' => 'Hawaii', 'ID' => 'Idaho',
+        'IL' => 'Illinois', 'IN' => 'Indiana', 'IA' => 'Iowa', 'KS' => 'Kansas',
+        'KY' => 'Kentucky', 'LA' => 'Louisiana', 'ME' => 'Maine', 'MD' => 'Maryland',
+        'MA' => 'Massachusetts', 'MI' => 'Michigan', 'MN' => 'Minnesota', 'MS' => 'Mississippi',
+        'MO' => 'Missouri', 'MT' => 'Montana', 'NE' => 'Nebraska', 'NV' => 'Nevada',
+        'NH' => 'New Hampshire', 'NJ' => 'New Jersey', 'NM' => 'New Mexico', 'NY' => 'New York',
+        'NC' => 'North Carolina', 'ND' => 'North Dakota', 'OH' => 'Ohio', 'OK' => 'Oklahoma',
+        'OR' => 'Oregon', 'PA' => 'Pennsylvania', 'RI' => 'Rhode Island', 'SC' => 'South Carolina',
+        'SD' => 'South Dakota', 'TN' => 'Tennessee', 'TX' => 'Texas', 'UT' => 'Utah',
+        'VT' => 'Vermont', 'VA' => 'Virginia', 'WA' => 'Washington', 'WV' => 'West Virginia',
+        'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
+      ];
+      $rows = Gym::selectRaw('state, count(*) as count')
+        ->whereNotNull('state')
+        ->where('state', '!=', '')
+        ->groupBy('state')
+        ->orderBy('state')
+        ->get();
+      $data = $rows->map(function ($row) use ($stateNames) {
+        return [
+          'state' => $row->state,
+          'stateName' => $stateNames[$row->state] ?? $row->state,
+          'count' => (int) $row->count,
+        ];
+      });
+      return response()->json($data);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@states: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
    * GET /api/v1/gyms/{gym_id}/addresses
    * Paginated list of addresses for a gym (default 5 per page).
    */
