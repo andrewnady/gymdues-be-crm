@@ -643,7 +643,7 @@ class GymsController extends Controller {
         }
 
         // Create other contacts (ensure we have an address when linking contacts to it)
-        if (!empty($data['contacts']) && is_array($data['contacts']) && !$address) {
+        if (!empty($data['contacts']) && is_array($data['contacts']) && $address) {
           foreach ($data['contacts'] as $contactData) {
             // Skip business_website if we already created it from domain
             if ($contactData['type'] === 'business_website' && $domain && !empty($requestData['domain'])) {
