@@ -1,0 +1,101 @@
+name: Build and Deploy CMS
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: Create deployment package
+        run: |
+          tar -czf cms-deploy.tar.gz \
+            --exclude='.git' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='node_modules' \
+            --exclude='storage/logs/*' \
+            --exclude='storage/framework/cache/*' \
+            --exclude='storage/framework/sessions/*' \
+            --exclude='storage/framework/views/*' \
+            --exclude='bootstrap/cache/*' \
+            --exclude='.github' \
+            .
+
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: cms-deployment-package
+          path: cms-deploy.tar.gz
+          retention-days: 1
+
+  deploy:
+    needs: package
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: cms-deployment-package
+          path: .
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Server
+        run: |
+          scp -i ~/.ssh/deploy_key cms-deploy.tar.gz ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:/tmp/
+          ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "set -e
+          APP_DIR='${{ vars.DEPLOY_PATH }}'
+          TEMP_DIR=\$(mktemp -d)
+          echo 'Deploying CMS to '\$APP_DIR'...'
+          tar -xzf /tmp/cms-deploy.tar.gz -C \"\$TEMP_DIR\"
+          mkdir -p \"\$APP_DIR\"
+          rsync -a --delete --exclude=.env --exclude='.env.*' --exclude=storage \"\$TEMP_DIR\"/ \"\$APP_DIR\"/
+          mkdir -p \"\$APP_DIR/storage/logs\" \"\$APP_DIR/storage/framework/cache\" \"\$APP_DIR/storage/framework/sessions\" \"\$APP_DIR/storage/framework/views\" \"\$APP_DIR/bootstrap/cache\"
+          chmod -R 775 \"\$APP_DIR/storage\" \"\$APP_DIR/bootstrap/cache\" 2>/dev/null || true
+          cd \"\$APP_DIR\"
+          php artisan winter:up --force 2>/dev/null || php artisan migrate --force 2>/dev/null || true
+          php artisan config:cache 2>/dev/null || true
+          php artisan route:cache 2>/dev/null || true
+          php artisan view:cache 2>/dev/null || true
+          rm -rf \"\$TEMP_DIR\" /tmp/cms-deploy.tar.gz
+          echo 'CMS deployment successful!'"
+
+      - name: Cleanup SSH Key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

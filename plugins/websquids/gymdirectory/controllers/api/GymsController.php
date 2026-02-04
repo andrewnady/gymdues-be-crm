@@ -140,15 +140,31 @@ class GymsController extends Controller {
 
   /**
    * GET /api/v1/gyms
-   * List all gyms with filters and pagination
+   * List all gyms with filters and pagination.
+   * Use ?fields=sitemap to get minimal data (id, slug, updated_at) for sitemap generation.
    */
   public function index(Request $request) {
     try {
-      // Get address_id from query if specified
+      $fields = $request->input('fields');
+      $sitemapOnly = ($fields === 'sitemap');
+
+      // Get address_id from query if specified (ignored when sitemapOnly)
       $addressId = $request->input('address_id');
 
       // 1. Query & Filter
       $perPage = $request->input('per_page', 12);
+
+      if ($sitemapOnly) {
+        $gyms = Gym::select(['id', 'slug', 'updated_at'])
+          ->filter($request->all())
+          ->paginate($perPage);
+        $gyms->getCollection()->transform(function ($gym) {
+          $gym->setVisible(['id', 'slug', 'updated_at']);
+          return $gym;
+        });
+        return $gyms;
+      }
+
       $gyms = Gym::with(['logo', 'gallery', 'addresses'])
         ->filter($request->all())
         ->paginate($perPage);
