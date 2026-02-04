@@ -37,7 +37,7 @@ jobs:
 
       - name: Create deployment package
         run: |
-          tar -czf cms-deploy.tar.gz \
+          tar -czf /tmp/cms-deploy.tar.gz \
             --exclude='.git' \
             --exclude='.env' \
             --exclude='.env.*' \
@@ -49,6 +49,7 @@ jobs:
             --exclude='bootstrap/cache/*' \
             --exclude='.github' \
             .
+          mv /tmp/cms-deploy.tar.gz .
 
       - name: Upload deployment package
         uses: actions/upload-artifact@v4
