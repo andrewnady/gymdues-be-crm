@@ -278,6 +278,58 @@ class GymsController extends Controller {
   }
 
   /**
+   * GET /api/v1/gyms/locations
+   * Locations (city, state, postal_code) with address counts for autocomplete.
+   * Each row has all three so dropdown can show "City, State Zipcode" or "Zipcode - City, State".
+   * Optional ?q= filters by city, state or postal_code. Sorted by count desc.
+   */
+  public function locations(Request $request) {
+    try {
+      $q = $request->input('q');
+      $qTrim = $q ? trim($q) : '';
+
+      $query = Address::selectRaw('city, state, postal_code, count(*) as count')
+        ->whereNotNull('city')
+        ->where('city', '!=', '')
+        ->whereNotNull('state')
+        ->where('state', '!=', '')
+        ->whereNotNull('postal_code')
+        ->where('postal_code', '!=', '')
+        ->groupBy('city', 'state', 'postal_code')
+        ->orderByRaw('count(*) desc');
+
+      if ($qTrim !== '') {
+        $query->where(function ($q) use ($qTrim) {
+          $q->where('city', 'like', '%' . $qTrim . '%')
+            ->orWhere('state', 'like', '%' . $qTrim . '%')
+            ->orWhere('postal_code', 'like', '%' . $qTrim . '%');
+        });
+      }
+
+      $out = [];
+      foreach ($query->limit(50)->get() as $row) {
+        $out[] = [
+          'label' => trim($row->city . ', ' . $row->state . ' ' . $row->postal_code),
+          'city' => $row->city,
+          'state' => $row->state,
+          'postal_code' => $row->postal_code,
+          'count' => (int) $row->count,
+        ];
+      }
+
+      return response()->json($out);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@locations: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
    * GET /api/v1/gyms/addresses-by-location
    * Addresses filtered by city and/or postal_code, grouped by gym.
    * Query params: city (optional), postal_code (optional), search (optional, matches city OR postal_code). At least one required.

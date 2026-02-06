@@ -15,8 +15,9 @@ Route::prefix('api/v1')
     Route::get('gyms', [GymsController::class, 'index']);
     Route::post('gyms', [GymsController::class, 'store']);
     Route::get('gyms/addresses-by-location', [GymsController::class, 'addressesByLocation']);
-    Route::get('gyms/{gym_id}/addresses', [GymsController::class, 'addresses']);
     Route::get('gyms/states', [GymsController::class, 'states']);
+    Route::get('gyms/locations', [GymsController::class, 'locations']);
+    Route::get('gyms/{gym_id}/addresses', [GymsController::class, 'addresses']);
     Route::get('addresses/{address_id}', [GymsController::class, 'address']);
     Route::get('gyms/{slug}', [GymsController::class, 'show']);
     
