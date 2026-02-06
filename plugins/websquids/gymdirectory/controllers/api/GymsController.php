@@ -278,8 +278,75 @@ class GymsController extends Controller {
   }
 
   /**
+   * GET /api/v1/gyms/addresses-by-location
+   * Addresses filtered by city and/or postal_code, grouped by gym.
+   * Query params: city (optional), postal_code (optional), search (optional, matches city OR postal_code). At least one required.
+   */
+  public function addressesByLocation(Request $request) {
+    try {
+      $city = $request->input('city');
+      $postalCode = $request->input('postal_code');
+      $search = $request->input('search');
+
+      $cityTrim = $city ? trim($city) : '';
+      $postalTrim = $postalCode ? trim($postalCode) : '';
+      $searchTrim = $search ? trim($search) : '';
+
+      if ($cityTrim === '' && $postalTrim === '' && $searchTrim === '') {
+        return response()->json(['data' => []]);
+      }
+
+      $query = Address::with(['gym:id,name,slug'])
+        ->orderByRaw('is_primary DESC')
+        ->orderBy('id');
+
+      if ($cityTrim !== '') {
+        $query->where('city', 'like', '%' . $cityTrim . '%');
+      }
+      if ($postalTrim !== '') {
+        $query->where('postal_code', 'like', '%' . $postalTrim . '%');
+      }
+      if ($searchTrim !== '') {
+        $query->where(function ($q) use ($searchTrim) {
+          $q->where('city', 'like', '%' . $searchTrim . '%')
+            ->orWhere('postal_code', 'like', '%' . $searchTrim . '%');
+        });
+      }
+
+      $addresses = $query->get();
+
+      $grouped = $addresses->groupBy('gym_id')->map(function ($addrs, $gymId) {
+        $gym = $addrs->first()->gym;
+        return [
+          'gym' => $gym ? [
+            'id' => $gym->id,
+            'name' => $gym->name,
+            'slug' => $gym->slug,
+          ] : null,
+          'addresses' => $addrs->map(function ($a) {
+            return $a->toArray();
+          })->values()->all(),
+        ];
+      })->filter(function ($item) {
+        return $item['gym'] !== null;
+      })->values()->all();
+
+      return response()->json(['data' => $grouped]);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@addressesByLocation: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
    * GET /api/v1/gyms/{gym_id}/addresses
    * Paginated list of addresses for a gym (default 5 per page).
+   * Optional query params: city, postal_code (filter addresses by location).
    */
   public function addresses($gym_id, Request $request) {
     try {
@@ -294,10 +361,18 @@ class GymsController extends Controller {
       $perPage = (int) $request->input('per_page', 500);
       $perPage = max(1, min(500, $perPage)); // clamp between 1 and 100
 
-      $paginator = Address::where('gym_id', $gym_id)
-        ->orderByRaw('is_primary DESC')
-        ->orderBy('id')
-        ->paginate($perPage);
+      $query = Address::where('gym_id', $gym_id);
+
+      $city = $request->input('city');
+      $postalCode = $request->input('postal_code');
+      if ($city && trim($city) !== '') {
+        $query->where('city', 'like', '%' . trim($city) . '%');
+      }
+      if ($postalCode && trim($postalCode) !== '') {
+        $query->where('postal_code', 'like', '%' . trim($postalCode) . '%');
+      }
+
+      $paginator = $query->orderByRaw('is_primary DESC')->orderBy('id')->paginate($perPage);
 
       return response()->json($paginator);
     } catch (\Exception $e) {
