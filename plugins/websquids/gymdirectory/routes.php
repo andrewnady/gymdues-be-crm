@@ -7,7 +7,8 @@ use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
 use Websquids\Gymdirectory\Controllers\Api\ContactSubmissionsController;
 use Websquids\Gymdirectory\Controllers\Api\NewsletterSubscriptionsController;
-use Winter\Blog\Controllers\Api\CommentsController;
+use Websquids\Gymdirectory\Controllers\Api\BlogController;
+use Websquids\Gymdirectory\Controllers\Api\CommentsController;
 
 Route::prefix('api/v1')
   ->middleware([ApiKeyMiddleware::class])
@@ -29,9 +30,11 @@ Route::prefix('api/v1')
     Route::get('static-pages', [StaticPagesController::class, 'index']);
     Route::get('static-pages/{slug}', [StaticPagesController::class, 'show']);
     
-    // Blog comments routes
+    // Blog routes (registered here so they work on production; Winter Blog plugin may load after)
+    Route::get('posts', [BlogController::class, 'index']);
     Route::get('posts/{slug}/comments', [CommentsController::class, 'index']);
     Route::post('posts/{slug}/comments', [CommentsController::class, 'store']);
+    Route::get('posts/{slug}', [BlogController::class, 'show']);
     
     // Contact submissions routes
     Route::post('contact-submissions', [ContactSubmissionsController::class, 'store']);

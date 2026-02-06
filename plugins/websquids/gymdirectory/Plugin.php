@@ -4,6 +4,20 @@ use System\Classes\PluginBase;
 
 class Plugin extends PluginBase
 {
+    public function pluginDetails()
+    {
+        return [
+            'name'        => 'Gym Directory',
+            'description' => 'Gym directory and API (includes custom blog API so it is never overwritten by Winter.Blog updates)',
+            'author'      => 'Websquids',
+        ];
+    }
+
+    /**
+     * Load after Winter.Blog so our api/v1/posts routes take precedence over the default plugin.
+     */
+    public $require = ['Winter.Blog'];
+
     public function registerComponents()
     {
     }
