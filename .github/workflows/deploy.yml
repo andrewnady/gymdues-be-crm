@@ -86,7 +86,7 @@ jobs:
           echo 'Deploying CMS to '\$APP_DIR'...'
           tar -xzf /tmp/cms-deploy.tar.gz -C \"\$TEMP_DIR\"
           mkdir -p \"\$APP_DIR\"
-          rsync -a --delete --exclude=.env --exclude='.env.*' --exclude=storage \"\$TEMP_DIR\"/ \"\$APP_DIR\"/
+          rsync -a --delete --exclude=.env --exclude='.env.*' --exclude=storage --exclude=bootstrap/cache \"\$TEMP_DIR\"/ \"\$APP_DIR\"/
           mkdir -p \"\$APP_DIR/storage/logs\" \"\$APP_DIR/storage/framework/cache\" \"\$APP_DIR/storage/framework/sessions\" \"\$APP_DIR/storage/framework/views\" \"\$APP_DIR/bootstrap/cache\"
           chmod -R 775 \"\$APP_DIR/storage\" \"\$APP_DIR/bootstrap/cache\" 2>/dev/null || true
           cd \"\$APP_DIR\"
