@@ -486,7 +486,8 @@ class GymsController extends Controller {
         // 'contacts',
         'faqs',
         'logo',
-        'gallery'
+        'gallery',
+        'featured_image',
       ])
         ->where('slug', $slug)
         ->firstOrFail();
