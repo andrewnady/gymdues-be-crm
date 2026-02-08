@@ -348,7 +348,9 @@ class GymsController extends Controller {
         return response()->json(['data' => []]);
       }
 
-      $query = Address::with(['gym:id,name,slug'])
+      $query = Address::with(['gym' => function ($q) {
+        $q->with('logo');
+      }, 'reviews'])
         ->orderByRaw('is_primary DESC')
         ->orderBy('id');
 
@@ -368,19 +370,35 @@ class GymsController extends Controller {
       $addresses = $query->get();
 
       $grouped = $addresses->groupBy('gym_id')->map(function ($addrs, $gymId) {
-        $gym = $addrs->first()->gym;
+        $firstAddr = $addrs->first();
+        $gym = $firstAddr->gym;
+        if (!$gym) {
+          return null;
+        }
+        $reviewsCount = $addrs->sum(function ($a) {
+          return $a->reviews ? $a->reviews->count() : 0;
+        });
+        $allRates = $addrs->flatMap(function ($a) {
+          return $a->reviews ? $a->reviews->pluck('rate') : collect();
+        })->filter();
+        $rating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
         return [
-          'gym' => $gym ? [
+          'gym' => [
             'id' => $gym->id,
             'name' => $gym->name,
             'slug' => $gym->slug,
-          ] : null,
+            'logo' => $gym->logo ? ['path' => $gym->logo->path, 'alt' => $gym->name] : null,
+            'rating' => $rating,
+            'reviewCount' => $reviewsCount,
+            'city' => $firstAddr->city,
+            'state' => $firstAddr->state,
+          ],
           'addresses' => $addrs->map(function ($a) {
             return $a->toArray();
           })->values()->all(),
         ];
       })->filter(function ($item) {
-        return $item['gym'] !== null;
+        return $item !== null;
       })->values()->all();
 
       return response()->json(['data' => $grouped]);
