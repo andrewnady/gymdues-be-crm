@@ -382,14 +382,16 @@ class GymsController extends Controller {
           return $a->reviews ? $a->reviews->pluck('rate') : collect();
         })->filter();
         $rating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
+        $logoPath = $gym->logo ? $gym->logo->getPath() : null;
         return [
           'gym' => [
             'id' => $gym->id,
             'name' => $gym->name,
             'slug' => $gym->slug,
-            'logo' => $gym->logo ? ['path' => $gym->logo->path, 'alt' => $gym->name] : null,
+            'logo' => $logoPath ? ['path' => $logoPath, 'alt' => $gym->name] : null,
             'rating' => $rating,
             'reviewCount' => $reviewsCount,
+            'review_count' => $reviewsCount,
             'city' => $firstAddr->city,
             'state' => $firstAddr->state,
           ],
