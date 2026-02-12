@@ -96,6 +96,3 @@
     - "Improve support with the Winter.Translate plugin"
 "2.2.1":
     - "Re-enable footnotes, tables and attributes in Markdown for Blog posts"
-"2.2.2":
-    - "Added comments system for blog posts"
-    - v2.0.2/create_comments_table.php

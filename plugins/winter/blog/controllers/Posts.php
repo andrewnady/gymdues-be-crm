@@ -88,13 +88,13 @@ class Posts extends Controller
         }
         $pluginManager = PluginManager::instance();
 
-        // Always use rich editor (WYSIWYG) instead of markdown
+        $useRichEditor = BlogSettings::get('use_rich_editor', false);
         $useMlWidget = $pluginManager->exists('Winter.Translate');
 
-        if ($useMlWidget) {
-            $widget->tabs['fields']['content']['type'] = 'Winter\Translate\FormWidgets\MLRichEditor';
-        } else {
-            $widget->tabs['fields']['content']['type'] = 'richeditor';
+        if ($useRichEditor) {
+            $widget->tabs['fields']['content']['type'] = $useMlWidget ? 'Winter\Translate\FormWidgets\MLRichEditor' : 'richeditor';
+        } elseif ($useMlWidget) {
+            $widget->tabs['fields']['content']['type'] = 'Winter\Blog\FormWidgets\MLBlogMarkdown';
         }
     }
 

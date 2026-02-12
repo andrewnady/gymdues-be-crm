@@ -1,8 +1,0 @@
-name: Comment
-form: $/winter/blog/models/comment/fields.yaml
-modelClass: Winter\Blog\Models\Comment
-defaultRedirect: winter/blog/comments
-update:
-    redirect: winter/blog/comments
-    redirectClose: winter/blog/comments
-

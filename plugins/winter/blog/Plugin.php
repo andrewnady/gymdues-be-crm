@@ -76,11 +76,6 @@ class Plugin extends PluginBase
                 'label' => 'winter.blog::lang.blog.access_publish',
                 'roles' => [UserRole::CODE_DEVELOPER, UserRole::CODE_PUBLISHER],
             ],
-            'winter.blog.manage_comments' => [
-                'tab'   => 'winter.blog::lang.blog.tab',
-                'label' => 'winter.blog::lang.blog.manage_comments',
-                'roles' => [UserRole::CODE_DEVELOPER, UserRole::CODE_PUBLISHER],
-            ],
         ];
     }
 
@@ -116,12 +111,6 @@ class Plugin extends PluginBase
                         'icon'        => 'icon-list-ul',
                         'url'         => Backend::url('winter/blog/categories'),
                         'permissions' => ['winter.blog.access_categories'],
-                    ],
-                    'comments' => [
-                        'label'       => 'Comments',
-                        'icon'        => 'icon-comments',
-                        'url'         => Backend::url('winter/blog/comments'),
-                        'permissions' => ['winter.blog.manage_comments'],
                     ],
                 ],
             ],

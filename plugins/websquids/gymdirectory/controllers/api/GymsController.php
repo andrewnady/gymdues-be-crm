@@ -194,6 +194,13 @@ class GymsController extends Controller {
         $gym->reviewCount = $reviewsCount;
         $gym->address = $address;
 
+        if ($gym->featured_image) {
+          $gym->featured_image = $gym->featured_image;
+        } else {
+          $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+          $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
+        }
+
         // Cleanup Output
         $gym->setVisible([
           'id',
@@ -207,6 +214,7 @@ class GymsController extends Controller {
           'reviewCount',
           'logo',
           'gallery',
+          'featured_image',
           'address'
         ]);
 

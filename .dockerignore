@@ -1,0 +1,14 @@
+vendor/
+node_modules/
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+.git/
+.gitignore
+.env
+.env.backup
+.env.production
+*.log
+.DS_Store
+Thumbs.db

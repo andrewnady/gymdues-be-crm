@@ -11,7 +11,6 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Lang;
 use System\Models\File;
 use Winter\Blog\Classes\TagProcessor;
-use Winter\Blog\Models\Comment;
 use Winter\Blog\Models\Settings as BlogSettings;
 use Winter\Pages\Classes\MenuItem;
 use Winter\Sitemap\Classes\DefinitionItem;
@@ -19,6 +18,7 @@ use Winter\Storm\Database\Model;
 use Winter\Storm\Database\NestedTreeScope;
 use Winter\Storm\Exception\ValidationException;
 use Winter\Storm\Support\Facades\Html;
+use Winter\Storm\Support\Facades\Markdown;
 use Winter\Storm\Support\Facades\URL;
 
 /**
@@ -111,14 +111,6 @@ class Post extends Model
         ],
     ];
 
-    public $hasMany = [
-        'comments' => [
-            Comment::class,
-            'key' => 'post_id',
-            'order' => 'created_at desc',
-        ],
-    ];
-
     /**
      * @var array The accessors to append to the model's array form.
      */
@@ -190,8 +182,16 @@ class Post extends Model
 
     public static function formatHtml($input, $preview = false)
     {
-        // Always use HTML (WYSIWYG) instead of markdown
-        $result = trim($input);
+        $useRichEditor = BlogSettings::get('use_rich_editor', false);
+
+        if ($useRichEditor) {
+            $result = trim($input);
+        } else {
+            $result = Markdown::enableFootnotes()
+                ->enableAttributes()
+                ->enableTables()
+                ->parse(trim($input));
+        }
 
         // Check to see if the HTML should be cleaned from potential XSS
         $user = BackendAuth::getUser();
