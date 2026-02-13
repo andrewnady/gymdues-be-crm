@@ -3,7 +3,6 @@ name: Build and Deploy CMS
 on:
   push:
     branches:
-      - dev
       - main
   workflow_dispatch:
 

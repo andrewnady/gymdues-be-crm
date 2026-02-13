@@ -11,6 +11,52 @@ No matter how large or small your project is, Winter provides a rich development
 [![License](https://img.shields.io/github/license/wintercms/winter?label=open%20source&style=flat-square)](https://packagist.org/packages/wintercms/winter)
 [![Discord](https://img.shields.io/badge/discord-join-purple?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/D5MFSPH6Ux)
 
+---
+
+## This project: Gymdues CMS
+
+This repository is the **Gymdues** Winter CMS instance: backend and content for the gym directory (gyms, reviews, etc.). The frontend is in the **gymdues-nextjs** repo and consumes this CMS via API.
+
+### Local setup
+
+1. Clone the repo and enter the directory:
+   ```bash
+   git clone <repository-url>
+   cd gymdues-winter-cms
+   ```
+
+2. Install PHP dependencies:
+   ```bash
+   composer install
+   ```
+
+3. Create and configure environment:
+   ```bash
+   php artisan winter:env
+   ```
+   Edit `.env` with your database and app settings.
+
+4. Run migrations and create admin account:
+   ```bash
+   php artisan winter:up
+   ```
+   The admin password is printed in the terminal.
+
+5. (Optional) Custom plugins such as `websquids/gymdirectory` are included; ensure they are enabled in the Winter backend if needed.
+
+### Deployment
+
+Only the **main** branch triggers automatic deployment.
+
+- **Trigger**: Push to `main` (or run the workflow manually).
+- **Pipeline**: `.github/workflows/deploy.yml` builds a deployment package (excluding `.env`, storage, cache, `.github`), uploads it to the server via SSH, then runs `winter:up`, config/route/view cache on the server.
+- **GitHub configuration** (Settings → Secrets and variables → Actions):
+  - **Variables**: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`
+  - **Secret**: `DEPLOY_SSH_KEY` (SSH private key for deploy)
+- **Manual deploy**: Actions → Build and Deploy CMS → Run workflow.
+
+---
+
 ## Installing Winter
 
 Winter can be installed in several ways for both new users and experienced developers - see our [Installation page](https://wintercms.com/install) for more information.
