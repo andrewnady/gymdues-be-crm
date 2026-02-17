@@ -1142,11 +1142,21 @@ class GymsController extends Controller {
         'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
       ];
 
-      $state = $request->input('state');
-      $stateTrim = $state ? trim($state) : '';
+      $stateInput = $request->input('state');
+      $cityInput = $request->input('city');
 
-      $city = $request->input('city');
-      $cityTrim = $city ? trim($city) : '';
+      // Support multiple values: comma-separated string or array
+      $states = [];
+      if ($stateInput) {
+        $states = is_array($stateInput) ? $stateInput : explode(',', $stateInput);
+        $states = array_filter(array_map('trim', $states), fn($v) => $v !== '');
+      }
+
+      $cities = [];
+      if ($cityInput) {
+        $cities = is_array($cityInput) ? $cityInput : explode(',', $cityInput);
+        $cities = array_filter(array_map('trim', $cities), fn($v) => $v !== '');
+      }
 
       $query = Gym::selectRaw('city, state')
         ->whereNotNull('city')
@@ -1158,21 +1168,25 @@ class GymsController extends Controller {
         ->orderBy('state')
         ->orderBy('city');
 
-      if ($stateTrim !== '') {
-        $query->where(function ($sub) use ($stateTrim, $stateNames) {
-          $sub->where('state', 'like', '%' . $stateTrim . '%');
+      if (!empty($states)) {
+        $query->where(function ($sub) use ($states, $stateNames) {
+          foreach ($states as $stateTrim) {
+            $sub->orWhere('state', 'like', '%' . $stateTrim . '%');
 
-          foreach ($stateNames as $abbr => $fullName) {
-            if (stripos($fullName, $stateTrim) !== false) {
-              $sub->orWhere('state', $abbr);
+            foreach ($stateNames as $abbr => $fullName) {
+              if (stripos($fullName, $stateTrim) !== false) {
+                $sub->orWhere('state', $abbr);
+              }
             }
           }
         });
       }
 
-      if ($cityTrim !== '') {
-        $query->where(function ($sub) use ($cityTrim) {
-          $sub->where('city', 'like', '%' . $cityTrim . '%');
+      if (!empty($cities)) {
+        $query->where(function ($sub) use ($cities) {
+          foreach ($cities as $cityTrim) {
+            $sub->orWhere('city', 'like', '%' . $cityTrim . '%');
+          }
         });
       }
 
@@ -1183,7 +1197,7 @@ class GymsController extends Controller {
 
       $topGyms = [];
 
-      if ($stateTrim !== '' || $cityTrim !== '') {
+      if (!empty($states) || !empty($cities)) {
         // User applied a filter — show matching city/state entries
         $rows = $query->get();
 
@@ -1191,7 +1205,7 @@ class GymsController extends Controller {
         $seenStates = [];
         foreach ($rows as $row) {
           // When state filter is given, include the state label AND all cities in that state
-          if ($stateTrim !== '' && !isset($seenStates[$row->state])) {
+          if (!empty($states) && !isset($seenStates[$row->state])) {
             $seenStates[$row->state] = true;
             $topGyms[] = [
               'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
