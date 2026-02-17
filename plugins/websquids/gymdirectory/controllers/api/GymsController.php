@@ -149,6 +149,7 @@ class GymsController extends Controller {
       $fields = $request->input('fields');
       $sitemapOnly = ($fields === 'sitemap');
       $topGymsOnly = ($fields === 'topgyms');
+      $trending = $request->input('trending');
 
       // Get address_id from query if specified (ignored when sitemapOnly)
       $addressId = $request->input('address_id');
@@ -244,9 +245,14 @@ class GymsController extends Controller {
         return response()->json(['data' => $topGyms]);
       }
 
-      $gyms = Gym::with(['logo', 'gallery', 'addresses'])
-        ->filter($request->all())
-        ->paginate($perPage);
+      $query = Gym::with(['logo', 'gallery', 'addresses'])
+        ->filter($request->all());
+
+      if ($trending) {
+        $query->where('trending', 1);
+      }
+
+      $gyms = $query->paginate($perPage);
 
       // 2. Transform Data
       $gyms->getCollection()->transform(function ($gym) use ($addressId) {

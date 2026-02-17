@@ -26,6 +26,7 @@ Route::prefix('api/v1')
     
     // Reviews routes
     Route::get('reviews', [ReviewsController::class, 'index']);
+    Route::post('reviews', [ReviewsController::class, 'store']);
     Route::get('reviews/{id}', [ReviewsController::class, 'show']);
     
     // Static pages routes
