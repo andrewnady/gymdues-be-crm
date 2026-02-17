@@ -1261,4 +1261,77 @@ class GymsController extends Controller {
       ], 500);
     }
   }
+
+  /**
+   * GET /api/v1/gyms/highly-rated
+   * Gyms with average rating > 4.5 and 20+ reviews for the homepage.
+   */
+  public function highlyRated() {
+    try {
+      $addresses = Address::with(['reviews', 'gym' => function ($q) {
+        $q->with(['logo', 'gallery', 'featured_image']);
+      }])->whereHas('gym')->get();
+
+      $gyms = $addresses->groupBy('gym_id')
+        ->map(function ($addrs) {
+          $gym = $addrs->first()->gym;
+          if (!$gym) {
+            return null;
+          }
+
+          $allRates = $addrs->flatMap(function ($a) {
+            return $a->reviews ? $a->reviews->pluck('rate') : collect();
+          })->filter();
+
+          $reviewCount = $allRates->count();
+          $avgRating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
+
+          if ($reviewCount < 20 || $avgRating <= 4.5) {
+            return null;
+          }
+
+          $firstAddr = $addrs->first();
+
+          $gym->rating = $avgRating;
+          $gym->reviewCount = $reviewCount;
+          $gym->address = $firstAddr->makeHidden('reviews');
+
+          if (!$gym->featured_image) {
+            $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+            $gym->featured_image = $latestGalleryImage ?: null;
+          }
+
+          $gym->setVisible([
+            'id',
+            'slug',
+            'trending',
+            'name',
+            'description',
+            'city',
+            'state',
+            'rating',
+            'reviewCount',
+            'logo',
+            'gallery',
+            'featured_image',
+            'address',
+          ]);
+
+          return $gym;
+        })
+        ->filter()
+        ->sortByDesc('rating')
+        ->values();
+
+      return response()->json(['data' => $gyms]);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@highlyRated: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
 }
