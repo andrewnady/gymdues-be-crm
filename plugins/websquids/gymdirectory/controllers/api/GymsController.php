@@ -185,7 +185,7 @@ class GymsController extends Controller {
         $addresses = $addrQuery->get()->makeHidden('reviews');
 
         $topGyms = $addresses->groupBy('gym_id')
-          ->map(function ($addrs) {
+          ->map(function ($addrs) use ($state, $city) {
             $gym = $addrs->first()->gym;
             if (!$gym) {
               return null;
@@ -217,6 +217,8 @@ class GymsController extends Controller {
               $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
             }
 
+            $gym->filterType = ($state && $city) ? 'state' : (($state) ? 'state' : 'city');
+
             // Use setVisible to match regular logic
             $gym->setVisible([
               'id',
@@ -231,7 +233,8 @@ class GymsController extends Controller {
               'logo',
               'gallery',
               'featured_image',
-              'address'
+              'address',
+              'filterType',
             ]);
 
             return $gym;
@@ -1192,6 +1195,7 @@ class GymsController extends Controller {
             $seenStates[$row->state] = true;
             $topGyms[] = [
               'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+              'type' => 'state',
               'filter' => $row->state,
             ];
           }
@@ -1199,6 +1203,7 @@ class GymsController extends Controller {
             $seenCities[$row->city] = true;
             $topGyms[] = [
               'label' => 'Top 10 Gyms in ' . $row->city,
+              'type' => 'city',
               'filter' => $row->city,
             ];
           }
@@ -1215,6 +1220,7 @@ class GymsController extends Controller {
         foreach ($cityRows as $row) {
           $topGyms[] = [
             'label' => 'Top 10 Gyms in ' . $row->city,
+            'type' => 'city',
             'filter' => $row->city,
           ];
         }
@@ -1229,6 +1235,7 @@ class GymsController extends Controller {
         foreach ($stateRows as $row) {
           $topGyms[] = [
             'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+            'type' => 'state',
             'filter' => $row->state,
           ];
         }
