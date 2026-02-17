@@ -1187,18 +1187,19 @@ class GymsController extends Controller {
         $seenCities = [];
         $seenStates = [];
         foreach ($rows as $row) {
-          if ($cityTrim !== '' && !isset($seenCities[$row->city])) {
-            $seenCities[$row->city] = true;
-            $topGyms[] = [
-              'label' => 'Top 10 Gyms in ' . $row->city,
-              'filter' => $row->city,
-            ];
-          }
+          // When state filter is given, include the state label AND all cities in that state
           if ($stateTrim !== '' && !isset($seenStates[$row->state])) {
             $seenStates[$row->state] = true;
             $topGyms[] = [
               'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
               'filter' => $row->state,
+            ];
+          }
+          if (!isset($seenCities[$row->city])) {
+            $seenCities[$row->city] = true;
+            $topGyms[] = [
+              'label' => 'Top 10 Gyms in ' . $row->city,
+              'filter' => $row->city,
             ];
           }
         }
