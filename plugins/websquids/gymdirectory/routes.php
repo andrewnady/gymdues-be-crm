@@ -20,6 +20,8 @@ Route::prefix('api/v1')
     Route::get('gyms/locations', [GymsController::class, 'locations']);
     Route::get('gyms/{gym_id}/addresses', [GymsController::class, 'addresses']);
     Route::get('addresses/{address_id}', [GymsController::class, 'address']);
+    Route::get('gyms/cities-and-states', [GymsController::class, 'citiesAndStates']);
+    Route::get('gyms/filtered-top-gyms', [GymsController::class, 'filteredTopGyms']);
     Route::get('gyms/{slug}', [GymsController::class, 'show']);
     
     // Reviews routes

@@ -2,6 +2,7 @@
 
 namespace Websquids\Gymdirectory\Controllers\Api;
 
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -147,6 +148,7 @@ class GymsController extends Controller {
     try {
       $fields = $request->input('fields');
       $sitemapOnly = ($fields === 'sitemap');
+      $topGymsOnly = ($fields === 'topgyms');
 
       // Get address_id from query if specified (ignored when sitemapOnly)
       $addressId = $request->input('address_id');
@@ -163,6 +165,86 @@ class GymsController extends Controller {
           return $gym;
         });
         return $gyms;
+      }
+
+      if ($topGymsOnly) {
+        $state = $request->input('state') ? trim($request->input('state')) : '';
+        $city = $request->input('city') ? trim($request->input('city')) : '';
+
+        $addrQuery = Address::with(['reviews', 'gym' => function ($q) {
+          $q->with(['logo', 'gallery', 'featured_image']);
+        }])->whereHas('gym');
+
+        if ($state !== '') {
+          $addrQuery->where('state', $state);
+        }
+        if ($city !== '') {
+          $addrQuery->where('city', $city);
+        }
+
+        $addresses = $addrQuery->get()->makeHidden('reviews');
+
+        $topGyms = $addresses->groupBy('gym_id')
+          ->map(function ($addrs) use ($state, $city) {
+            $gym = $addrs->first()->gym;
+            if (!$gym) {
+              return null;
+            }
+
+            $allRates = $addrs->flatMap(function ($a) {
+              return $a->reviews ? $a->reviews->pluck('rate') : collect();
+            })->filter();
+
+            $reviewCount = $allRates->count();
+            $avgRating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
+
+            if ($reviewCount < 15 || $avgRating < 4) {
+              return null;
+            }
+
+            $firstAddr = $addrs->first();
+
+            // Set computed properties on gym
+            $gym->rating = $avgRating;
+            $gym->reviewCount = $reviewCount;
+            $gym->address = $firstAddr;
+
+            // Set featured_image logic (same as regular logic)
+            if ($gym->featured_image) {
+              $gym->featured_image = $gym->featured_image;
+            } else {
+              $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+              $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
+            }
+
+            $gym->filterType = ($state && $city) ? 'state' : (($state) ? 'state' : 'city');
+
+            // Use setVisible to match regular logic
+            $gym->setVisible([
+              'id',
+              'slug',
+              'trending',
+              'name',
+              'description',
+              'city',
+              'state',
+              'rating',
+              'reviewCount',
+              'logo',
+              'gallery',
+              'featured_image',
+              'address',
+              'filterType',
+            ]);
+
+            return $gym;
+          })
+          ->filter()
+          ->sortByDesc('rating')
+          ->take(10)
+          ->values();
+
+        return response()->json(['data' => $topGyms]);
       }
 
       $gyms = Gym::with(['logo', 'gallery', 'addresses'])
@@ -966,6 +1048,216 @@ class GymsController extends Controller {
       return response()->json([
         'error' => 'Internal server error',
         'message' => $e->getMessage()
+      ], 500);
+    }
+  }
+
+  /**
+   * GET /api/v1/gyms/cities-and-states
+   * All city+state combinations with gym counts.
+   */
+  public function citiesAndStates(Request $request) {
+    try {
+      $stateNames = [
+        'AL' => 'Alabama', 'AK' => 'Alaska', 'AZ' => 'Arizona', 'AR' => 'Arkansas',
+        'CA' => 'California', 'CO' => 'Colorado', 'CT' => 'Connecticut', 'DE' => 'Delaware',
+        'FL' => 'Florida', 'GA' => 'Georgia', 'HI' => 'Hawaii', 'ID' => 'Idaho',
+        'IL' => 'Illinois', 'IN' => 'Indiana', 'IA' => 'Iowa', 'KS' => 'Kansas',
+        'KY' => 'Kentucky', 'LA' => 'Louisiana', 'ME' => 'Maine', 'MD' => 'Maryland',
+        'MA' => 'Massachusetts', 'MI' => 'Michigan', 'MN' => 'Minnesota', 'MS' => 'Mississippi',
+        'MO' => 'Missouri', 'MT' => 'Montana', 'NE' => 'Nebraska', 'NV' => 'Nevada',
+        'NH' => 'New Hampshire', 'NJ' => 'New Jersey', 'NM' => 'New Mexico', 'NY' => 'New York',
+        'NC' => 'North Carolina', 'ND' => 'North Dakota', 'OH' => 'Ohio', 'OK' => 'Oklahoma',
+        'OR' => 'Oregon', 'PA' => 'Pennsylvania', 'RI' => 'Rhode Island', 'SC' => 'South Carolina',
+        'SD' => 'South Dakota', 'TN' => 'Tennessee', 'TX' => 'Texas', 'UT' => 'Utah',
+        'VT' => 'Vermont', 'VA' => 'Virginia', 'WA' => 'Washington', 'WV' => 'West Virginia',
+        'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
+      ];
+
+      $stateRows = Gym::selectRaw('state, count(*) as count')
+        ->whereNotNull('state')
+        ->where('state', '!=', '')
+        ->groupBy('state')
+        ->orderBy('state')
+        ->get();
+      $states = $stateRows->map(function ($row) use ($stateNames) {
+        return [
+          'state' => $row->state,
+          'stateName' => $stateNames[$row->state] ?? $row->state,
+          'count' => (int) $row->count,
+        ];
+      });
+
+      $cityRows = Gym::selectRaw('city, count(*) as count')
+        ->whereNotNull('city')
+        ->where('city', '!=', '')
+        ->groupBy('city')
+        ->orderByDesc('count')
+        ->limit(50)
+        ->get()
+        ->sortBy('city')
+        ->values();
+      $cities = $cityRows->map(function ($row) {
+        return [
+          'city' => $row->city,
+          'count' => (int) $row->count,
+        ];
+      });
+
+      return response()->json([
+        'cities' => $cities,
+        'states' => $states,
+      ]);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@citiesAndStates: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
+   * GET /api/v1/gyms/filtered-top-gyms
+   * Filtered top gyms.
+   * Optional ?state= filters by state name&city= filter by city name.
+   */
+  public function filteredTopGyms(Request $request) {
+    try {
+      $stateNames = [
+        'AL' => 'Alabama', 'AK' => 'Alaska', 'AZ' => 'Arizona', 'AR' => 'Arkansas',
+        'CA' => 'California', 'CO' => 'Colorado', 'CT' => 'Connecticut', 'DE' => 'Delaware',
+        'FL' => 'Florida', 'GA' => 'Georgia', 'HI' => 'Hawaii', 'ID' => 'Idaho',
+        'IL' => 'Illinois', 'IN' => 'Indiana', 'IA' => 'Iowa', 'KS' => 'Kansas',
+        'KY' => 'Kentucky', 'LA' => 'Louisiana', 'ME' => 'Maine', 'MD' => 'Maryland',
+        'MA' => 'Massachusetts', 'MI' => 'Michigan', 'MN' => 'Minnesota', 'MS' => 'Mississippi',
+        'MO' => 'Missouri', 'MT' => 'Montana', 'NE' => 'Nebraska', 'NV' => 'Nevada',
+        'NH' => 'New Hampshire', 'NJ' => 'New Jersey', 'NM' => 'New Mexico', 'NY' => 'New York',
+        'NC' => 'North Carolina', 'ND' => 'North Dakota', 'OH' => 'Ohio', 'OK' => 'Oklahoma',
+        'OR' => 'Oregon', 'PA' => 'Pennsylvania', 'RI' => 'Rhode Island', 'SC' => 'South Carolina',
+        'SD' => 'South Dakota', 'TN' => 'Tennessee', 'TX' => 'Texas', 'UT' => 'Utah',
+        'VT' => 'Vermont', 'VA' => 'Virginia', 'WA' => 'Washington', 'WV' => 'West Virginia',
+        'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
+      ];
+
+      $state = $request->input('state');
+      $stateTrim = $state ? trim($state) : '';
+
+      $city = $request->input('city');
+      $cityTrim = $city ? trim($city) : '';
+
+      $query = Gym::selectRaw('city, state')
+        ->whereNotNull('city')
+        ->where('city', '!=', '')
+        ->whereNotNull('state')
+        ->where('state', '!=', '')
+        ->groupBy('city', 'state')
+        ->orderByRaw('count(DISTINCT id) DESC')
+        ->orderBy('state')
+        ->orderBy('city');
+
+      if ($stateTrim !== '') {
+        $query->where(function ($sub) use ($stateTrim, $stateNames) {
+          $sub->where('state', 'like', '%' . $stateTrim . '%');
+
+          foreach ($stateNames as $abbr => $fullName) {
+            if (stripos($fullName, $stateTrim) !== false) {
+              $sub->orWhere('state', $abbr);
+            }
+          }
+        });
+      }
+
+      if ($cityTrim !== '') {
+        $query->where(function ($sub) use ($cityTrim) {
+          $sub->where('city', 'like', '%' . $cityTrim . '%');
+        });
+      }
+
+      $perPage = (int) $request->input('per_page', 50);
+      $page = (int) $request->input('page', 1);
+      $perPage = max(1, min(100, $perPage));
+      $page = max(1, $page);
+
+      $topGyms = [];
+
+      if ($stateTrim !== '' || $cityTrim !== '') {
+        // User applied a filter — show matching city/state entries
+        $rows = $query->get();
+
+        $seenCities = [];
+        $seenStates = [];
+        foreach ($rows as $row) {
+          // When state filter is given, include the state label AND all cities in that state
+          if ($stateTrim !== '' && !isset($seenStates[$row->state])) {
+            $seenStates[$row->state] = true;
+            $topGyms[] = [
+              'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+              'type' => 'state',
+              'filter' => $row->state,
+            ];
+          }
+          if (!isset($seenCities[$row->city])) {
+            $seenCities[$row->city] = true;
+            $topGyms[] = [
+              'label' => 'Top 10 Gyms in ' . $row->city,
+              'type' => 'city',
+              'filter' => $row->city,
+            ];
+          }
+        }
+      } else {
+        // Default — show a mix of top cities and top states
+        $cityRows = Gym::selectRaw('city, count(DISTINCT id) as count')
+          ->whereNotNull('city')
+          ->where('city', '!=', '')
+          ->groupBy('city')
+          ->orderByDesc('count')
+          ->get();
+
+        foreach ($cityRows as $row) {
+          $topGyms[] = [
+            'label' => 'Top 10 Gyms in ' . $row->city,
+            'type' => 'city',
+            'filter' => $row->city,
+          ];
+        }
+
+        $stateRows = Gym::selectRaw('state, count(DISTINCT id) as count')
+          ->whereNotNull('state')
+          ->where('state', '!=', '')
+          ->groupBy('state')
+          ->orderByDesc('count')
+          ->get();
+
+        foreach ($stateRows as $row) {
+          $topGyms[] = [
+            'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+            'type' => 'state',
+            'filter' => $row->state,
+          ];
+        }
+      }
+
+      $total = count($topGyms);
+
+      $sliced = array_slice($topGyms, ($page - 1) * $perPage, $perPage);
+
+      $paginator = new LengthAwarePaginator($sliced, $total, $perPage, $page);
+
+      $result = $paginator->toArray();
+      unset($result['links']);
+
+      return response()->json($result);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@filteredTopGyms: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
       ], 500);
     }
   }
