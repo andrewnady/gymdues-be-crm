@@ -93,6 +93,13 @@ class Post extends Model
         'user' => [User::class],
     ];
 
+    public $hasMany = [
+        'comments' => [
+            Comment::class,
+            'key' => 'post_id'
+        ],
+    ];
+
     public $belongsToMany = [
         'categories' => [
             Category::class,

@@ -22,7 +22,10 @@ class ReviewsController extends Controller {
 
     // Filter by gym slug
     if ($request->has('not_null') && ($request->has('not_null') == 'true' || $request->has('not_null') == true)) {
-      $query->whereNotNull('text');
+      $query->where(function ($q) {
+        $q->whereNotNull('text');
+        $q->where('text', '<>', '');
+      });  
     }
 
     // Filter by gym slug
