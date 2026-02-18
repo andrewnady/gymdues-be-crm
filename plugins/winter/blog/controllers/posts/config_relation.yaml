@@ -1,0 +1,11 @@
+# ===================================
+#  Relation Behavior Config
+# ===================================
+
+comments:
+    label: Comments
+    view:
+        list: $/winter/blog/models/comment/columns.yaml
+        toolbarButtons: create|delete
+    manage:
+        form: $/winter/blog/models/comment/fields.yaml

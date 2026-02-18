@@ -1,0 +1,16 @@
+columns:
+    name:
+        label: Name
+        type: text
+    email:
+        label: Email
+        type: text
+    comment:
+        label: Comment
+        type: text
+    is_approved:
+        label: Approved
+        type: switch
+    created_at:
+        label: Date
+        type: datetime
