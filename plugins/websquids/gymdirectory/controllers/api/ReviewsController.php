@@ -18,6 +18,7 @@ class ReviewsController extends Controller {
     // Query reviews with gym relationship - only show approved by default
     $query = Review::with(['address.gym'])
       ->approved()
+      ->whereNotNull('text')
       ->orderBy('reviewed_at', 'desc');
 
     // Filter by gym slug
