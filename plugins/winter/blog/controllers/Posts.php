@@ -16,7 +16,10 @@ class Posts extends Controller
         \Backend\Behaviors\FormController::class,
         \Backend\Behaviors\ListController::class,
         \Backend\Behaviors\ImportExportController::class,
+        \Backend\Behaviors\RelationController::class,
     ];
+
+    public $relationConfig = 'config_relation.yaml';
 
     public $requiredPermissions = ['winter.blog.access_other_posts', 'winter.blog.access_posts'];
 

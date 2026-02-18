@@ -305,9 +305,14 @@ class GymsController extends Controller {
         return response()->json(['data' => $popularGyms]);
       }
 
-      $gyms = Gym::with(['logo', 'gallery', 'addresses'])
-        ->filter($request->all())
-        ->paginate($perPage);
+      $query = Gym::with(['logo', 'gallery', 'addresses'])
+        ->filter($request->all());
+
+      if ($trending) {
+        $query->where('trending', 1);
+      }
+
+      $gyms = $query->paginate($perPage);
 
       // 2. Transform Data
       $gyms->getCollection()->transform(function ($gym) use ($addressId) {

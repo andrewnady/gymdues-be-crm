@@ -1,0 +1,18 @@
+fields:
+    name:
+        label: Name
+        span: left
+        type: text
+    email:
+        label: Email
+        span: right
+        type: text
+    comment:
+        label: Comment
+        span: full
+        type: textarea
+        size: small
+    is_approved:
+        label: Approved
+        span: left
+        type: switch

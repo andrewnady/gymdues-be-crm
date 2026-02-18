@@ -90,3 +90,9 @@ tabs:
             mode: image
             imageWidth: 200
             imageHeight: 200
+
+        comments:
+            tab: Comments
+            span: full
+            path: $/winter/blog/controllers/posts/_relation_comments.htm
+            type: partial
