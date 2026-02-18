@@ -150,6 +150,7 @@ class GymsController extends Controller {
       $sitemapOnly = ($fields === 'sitemap');
       $topGymsOnly = ($fields === 'topgyms');
       $trending = ($request->input('trending') == 'true') ? true : false;
+      $popularGymsOnly = ($request->input('popular') == 'true') ? true : false;
 
       // Get address_id from query if specified (ignored when sitemapOnly)
       $addressId = $request->input('address_id');
@@ -186,7 +187,7 @@ class GymsController extends Controller {
         $addresses = $addrQuery->get()->makeHidden('reviews');
 
         $topGyms = $addresses->groupBy('gym_id')
-          ->map(function ($addrs) {
+          ->map(function ($addrs) use ($state, $city) {
             $gym = $addrs->first()->gym;
             if (!$gym) {
               return null;
@@ -218,6 +219,8 @@ class GymsController extends Controller {
               $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
             }
 
+            $gym->filterType = ($state && $city) ? 'state' : (($state) ? 'state' : 'city');
+
             // Use setVisible to match regular logic
             $gym->setVisible([
               'id',
@@ -232,7 +235,8 @@ class GymsController extends Controller {
               'logo',
               'gallery',
               'featured_image',
-              'address'
+              'address',
+              'filterType',
             ]);
 
             return $gym;
@@ -245,14 +249,65 @@ class GymsController extends Controller {
         return response()->json(['data' => $topGyms]);
       }
 
-      $query = Gym::with(['logo', 'gallery', 'addresses'])
-        ->filter($request->all());
+      if ($popularGymsOnly) {
+        $popularGyms = Gym::with(['logo', 'gallery', 'addresses'])
+          ->where('is_popular', 1)
+          ->limit(5)
+          ->get();
 
-      if ($trending) {
-        $query->where('trending', 1);
+        $popularGyms->transform(function ($gym) use ($addressId) {
+          $address = null;
+          if ($addressId) {
+            $address = $gym->addresses()->where('id', $addressId)->first();
+          }
+          if (!$address) {
+            $address = $gym->getPrimaryAddress();
+          }
+
+          if ($address) {
+            $reviewsCount = $address->reviews()->count();
+            $reviewsAvg = $address->reviews()->avg('rate');
+          } else {
+            $reviewsCount = 0;
+            $reviewsAvg = 0;
+          }
+
+          $gym->rating = $reviewsAvg ? round((float)$reviewsAvg, 2) : 0;
+          $gym->reviewCount = $reviewsCount;
+          $gym->address = $address;
+
+          if ($gym->featured_image) {
+            $gym->featured_image = $gym->featured_image;
+          } else {
+            $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+            $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
+          }
+
+          $gym->setVisible([
+            'id',
+            'slug',
+            'trending',
+            'name',
+            'description',
+            'city',
+            'state',
+            'rating',
+            'reviewCount',
+            'logo',
+            'gallery',
+            'featured_image',
+            'address',
+          ]);
+
+          return $gym;
+        });
+
+        return response()->json(['data' => $popularGyms]);
       }
 
-      $gyms = $query->paginate($perPage);
+      $gyms = Gym::with(['logo', 'gallery', 'addresses'])
+        ->filter($request->all())
+        ->paginate($perPage);
 
       // 2. Transform Data
       $gyms->getCollection()->transform(function ($gym) use ($addressId) {
@@ -1145,11 +1200,21 @@ class GymsController extends Controller {
         'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
       ];
 
-      $state = $request->input('state');
-      $stateTrim = $state ? trim($state) : '';
+      $stateInput = $request->input('state');
+      $cityInput = $request->input('city');
 
-      $city = $request->input('city');
-      $cityTrim = $city ? trim($city) : '';
+      // Support multiple values: comma-separated string or array
+      $states = [];
+      if ($stateInput) {
+        $states = is_array($stateInput) ? $stateInput : explode(',', $stateInput);
+        $states = array_filter(array_map('trim', $states), fn($v) => $v !== '');
+      }
+
+      $cities = [];
+      if ($cityInput) {
+        $cities = is_array($cityInput) ? $cityInput : explode(',', $cityInput);
+        $cities = array_filter(array_map('trim', $cities), fn($v) => $v !== '');
+      }
 
       $query = Gym::selectRaw('city, state')
         ->whereNotNull('city')
@@ -1161,21 +1226,25 @@ class GymsController extends Controller {
         ->orderBy('state')
         ->orderBy('city');
 
-      if ($stateTrim !== '') {
-        $query->where(function ($sub) use ($stateTrim, $stateNames) {
-          $sub->where('state', 'like', '%' . $stateTrim . '%');
+      if (!empty($states)) {
+        $query->where(function ($sub) use ($states, $stateNames) {
+          foreach ($states as $stateTrim) {
+            $sub->orWhere('state', 'like', '%' . $stateTrim . '%');
 
-          foreach ($stateNames as $abbr => $fullName) {
-            if (stripos($fullName, $stateTrim) !== false) {
-              $sub->orWhere('state', $abbr);
+            foreach ($stateNames as $abbr => $fullName) {
+              if (stripos($fullName, $stateTrim) !== false) {
+                $sub->orWhere('state', $abbr);
+              }
             }
           }
         });
       }
 
-      if ($cityTrim !== '') {
-        $query->where(function ($sub) use ($cityTrim) {
-          $sub->where('city', 'like', '%' . $cityTrim . '%');
+      if (!empty($cities)) {
+        $query->where(function ($sub) use ($cities) {
+          foreach ($cities as $cityTrim) {
+            $sub->orWhere('city', 'like', '%' . $cityTrim . '%');
+          }
         });
       }
 
@@ -1186,25 +1255,28 @@ class GymsController extends Controller {
 
       $topGyms = [];
 
-      if ($stateTrim !== '' || $cityTrim !== '') {
+      if (!empty($states) || !empty($cities)) {
         // User applied a filter — show matching city/state entries
         $rows = $query->get();
 
         $seenCities = [];
         $seenStates = [];
         foreach ($rows as $row) {
-          if ($cityTrim !== '' && !isset($seenCities[$row->city])) {
-            $seenCities[$row->city] = true;
-            $topGyms[] = [
-              'label' => 'Top 10 Gyms in ' . $row->city,
-              'filter' => $row->city,
-            ];
-          }
-          if ($stateTrim !== '' && !isset($seenStates[$row->state])) {
+          // When state filter is given, include the state label AND all cities in that state
+          if (!empty($states) && !isset($seenStates[$row->state])) {
             $seenStates[$row->state] = true;
             $topGyms[] = [
               'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+              'type' => 'state',
               'filter' => $row->state,
+            ];
+          }
+          if (!isset($seenCities[$row->city])) {
+            $seenCities[$row->city] = true;
+            $topGyms[] = [
+              'label' => 'Top 10 Gyms in ' . $row->city,
+              'type' => 'city',
+              'filter' => $row->city,
             ];
           }
         }
@@ -1220,6 +1292,7 @@ class GymsController extends Controller {
         foreach ($cityRows as $row) {
           $topGyms[] = [
             'label' => 'Top 10 Gyms in ' . $row->city,
+            'type' => 'city',
             'filter' => $row->city,
           ];
         }
@@ -1234,6 +1307,7 @@ class GymsController extends Controller {
         foreach ($stateRows as $row) {
           $topGyms[] = [
             'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+            'type' => 'state',
             'filter' => $row->state,
           ];
         }
