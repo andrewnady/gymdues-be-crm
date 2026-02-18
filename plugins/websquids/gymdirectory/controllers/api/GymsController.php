@@ -149,7 +149,7 @@ class GymsController extends Controller {
       $fields = $request->input('fields');
       $sitemapOnly = ($fields === 'sitemap');
       $topGymsOnly = ($fields === 'topgyms');
-      $popularGymsOnly = ($request->input('fields') == 'true') ? true : false;
+      $popularGymsOnly = ($request->input('popular') == 'true') ? true : false;
 
       // Get address_id from query if specified (ignored when sitemapOnly)
       $addressId = $request->input('address_id');
