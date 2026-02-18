@@ -149,6 +149,8 @@ class GymsController extends Controller {
       $fields = $request->input('fields');
       $sitemapOnly = ($fields === 'sitemap');
       $topGymsOnly = ($fields === 'topgyms');
+      $trending = ($request->input('trending') == 'true') ? true : false;
+      $popularGymsOnly = ($request->input('popular') == 'true') ? true : false;
 
       // Get address_id from query if specified (ignored when sitemapOnly)
       $addressId = $request->input('address_id');
@@ -245,6 +247,62 @@ class GymsController extends Controller {
           ->values();
 
         return response()->json(['data' => $topGyms]);
+      }
+
+      if ($popularGymsOnly) {
+        $popularGyms = Gym::with(['logo', 'gallery', 'addresses'])
+          ->where('is_popular', 1)
+          ->limit(5)
+          ->get();
+
+        $popularGyms->transform(function ($gym) use ($addressId) {
+          $address = null;
+          if ($addressId) {
+            $address = $gym->addresses()->where('id', $addressId)->first();
+          }
+          if (!$address) {
+            $address = $gym->getPrimaryAddress();
+          }
+
+          if ($address) {
+            $reviewsCount = $address->reviews()->count();
+            $reviewsAvg = $address->reviews()->avg('rate');
+          } else {
+            $reviewsCount = 0;
+            $reviewsAvg = 0;
+          }
+
+          $gym->rating = $reviewsAvg ? round((float)$reviewsAvg, 2) : 0;
+          $gym->reviewCount = $reviewsCount;
+          $gym->address = $address;
+
+          if ($gym->featured_image) {
+            $gym->featured_image = $gym->featured_image;
+          } else {
+            $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+            $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
+          }
+
+          $gym->setVisible([
+            'id',
+            'slug',
+            'trending',
+            'name',
+            'description',
+            'city',
+            'state',
+            'rating',
+            'reviewCount',
+            'logo',
+            'gallery',
+            'featured_image',
+            'address',
+          ]);
+
+          return $gym;
+        });
+
+        return response()->json(['data' => $popularGyms]);
       }
 
       $gyms = Gym::with(['logo', 'gallery', 'addresses'])

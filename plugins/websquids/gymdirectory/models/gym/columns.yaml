@@ -9,6 +9,7 @@ columns:
         label: 'websquids.gymdirectory::lang.plugin.name'
         type: text
         sortable: true
+        searchable: true
     logo:
         label: Logo
         type: image
@@ -17,6 +18,11 @@ columns:
         type: image
     trending:
         label: Trending
+        type: switch
+        searchable: true
+        sortable: true
+    is_popular:
+        label: Popular
         type: switch
         searchable: true
         sortable: true

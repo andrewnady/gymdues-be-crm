@@ -104,3 +104,9 @@
     - builder_table_update_websquids_gymdirectory_addresses_2.php
 1.0.36:
     - 'Migrate existing gym_id data to address_id for reviews, hours, and pricing'
+1.0.37:
+    - 'Add email, status, and source columns to reviews for user-submitted reviews with approval workflow'
+    - builder_table_add_approval_to_reviews.php
+1.0.38:
+    - 'Updated table websquids_gymdirectory_gyms - add is_popular field'
+    - builder_table_update_websquids_gymdirectory_gyms_10.php

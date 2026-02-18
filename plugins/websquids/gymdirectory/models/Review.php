@@ -27,9 +27,33 @@ class Review extends Model
     ];
 
     /**
+     * @var array Guarded attributes
+     */
+    protected $guarded = [];
+
+    /**
      * @var array Attributes to hide from array/JSON (avoids circular ref in API)
      */
     protected $hidden = ['address'];
+
+    /**
+     * Scope: only approved or google-imported reviews
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('status', 'approved')
+              ->orWhereNull('status');
+        });
+    }
+
+    /**
+     * Scope: only pending reviews (for admin)
+     */
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
 
     public $belongsTo = [
         'address' => [
