@@ -1271,7 +1271,7 @@ class GymsController extends Controller {
           if (!empty($states) && !isset($seenStates[$row->state])) {
             $seenStates[$row->state] = true;
             $topGyms[] = [
-              'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+              'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
               'type' => 'state',
               'filter' => $row->state,
             ];
@@ -1279,7 +1279,7 @@ class GymsController extends Controller {
           if (!isset($seenCities[$row->city])) {
             $seenCities[$row->city] = true;
             $topGyms[] = [
-              'label' => 'Top 10 Gyms in ' . $row->city,
+              'label' => 'Best Gyms in ' . $row->city,
               'type' => 'city',
               'filter' => $row->city,
             ];
@@ -1296,7 +1296,7 @@ class GymsController extends Controller {
 
         foreach ($cityRows as $row) {
           $topGyms[] = [
-            'label' => 'Top 10 Gyms in ' . $row->city,
+            'label' => 'Best Gyms in ' . $row->city,
             'type' => 'city',
             'filter' => $row->city,
           ];
@@ -1311,7 +1311,7 @@ class GymsController extends Controller {
 
         foreach ($stateRows as $row) {
           $topGyms[] = [
-            'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+            'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
             'type' => 'state',
             'filter' => $row->state,
           ];
