@@ -17,6 +17,8 @@ use websquids\Gymdirectory\Models\Hour;
 use websquids\Gymdirectory\Models\Pricing;
 use websquids\Gymdirectory\Models\Review;
 
+use Illuminate\Support\Facades\DB;
+
 class GymsController extends Controller {
   /**
    * Extract domain from URL
@@ -1352,71 +1354,76 @@ class GymsController extends Controller {
       $page = (int) $request->input('page', 1);
       $page = max(1, $page);
 
-      // Use withCount/withAvg so review records are never loaded into memory —
-      // the DB returns only the aggregate values per address row.
-      $addresses = Address::with(['gym' => function ($q) {
-        $q->with(['logo', 'gallery', 'featured_image']);
-      }])
-        ->withCount('reviews')
-        ->withAvg('reviews', 'rate')
-        ->whereHas('gym')
-        ->whereHas('reviews')
-        ->get();
+      // Aggregate at the DB level: group all reviews across every address of a gym,
+      // filter by >= 20 reviews AND avg > 4.5 — no PHP-level filtering needed.
+      $qualifiers = DB::table('websquids_gymdirectory_addresses as a')
+        ->join('websquids_gymdirectory_reviews as r', 'r.address_id', '=', 'a.id')
+        ->select(
+          'a.gym_id',
+          DB::raw('COUNT(r.id) as total_reviews'),
+          DB::raw('AVG(r.rate)  as avg_rating')
+        )
+        ->groupBy('a.gym_id')
+        ->having('total_reviews', '>=', 20)
+        ->having('avg_rating', '>', 4.5)
+        ->orderByDesc('avg_rating')
+        ->get()
+        ->keyBy('gym_id');
 
-      // Group by gym, compute per-gym weighted average, and filter qualifiers.
-      $gyms = $addresses->groupBy('gym_id')
-        ->map(function ($addrs) {
-          $gym = $addrs->first()->gym;
-          if (!$gym) {
-            return null;
-          }
+      $total = $qualifiers->count();
 
-          // Weighted average across all addresses for this gym
-          $totalReviews = $addrs->sum('reviews_count');
-          $weightedSum = $addrs->sum(fn($a) => $a->reviews_count * (float) $a->reviews_avg_rate);
-          $avgRating = $totalReviews > 0 ? round($weightedSum / $totalReviews, 2) : 0;
+      // Paginate the small qualifier list, then load gym details only for that slice.
+      $slicedIds = $qualifiers->forPage($page, $perPage)->keys();
 
-          if ($totalReviews < 20 || $avgRating <= 4.5) {
-            return null;
-          }
+      $gymMap = Gym::with(['logo', 'gallery', 'featured_image'])
+        ->whereIn('id', $slicedIds)
+        ->get()
+        ->keyBy('id');
 
-          $firstAddr = $addrs->first();
+      // Load one primary address per gym for the response.
+      $addressMap = Address::whereIn('gym_id', $slicedIds)
+        ->orderByRaw('is_primary DESC')
+        ->orderBy('id')
+        ->get()
+        ->groupBy('gym_id')
+        ->map(fn($addrs) => $addrs->first());
 
-          $gym->rating = $avgRating;
-          $gym->reviewCount = $totalReviews;
-          $gym->address = $firstAddr;
+      $gyms = $slicedIds->map(function ($gymId) use ($qualifiers, $gymMap, $addressMap) {
+        $gym = $gymMap->get($gymId);
+        if (!$gym) {
+          return null;
+        }
 
-          if (!$gym->featured_image) {
-            $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
-            $gym->featured_image = $latestGalleryImage ?: null;
-          }
+        $row = $qualifiers->get($gymId);
+        $gym->rating = round((float) $row->avg_rating, 2);
+        $gym->reviewCount = (int) $row->total_reviews;
+        $gym->address = $addressMap->get($gymId);
 
-          $gym->setVisible([
-            'id',
-            'slug',
-            'trending',
-            'name',
-            'description',
-            'city',
-            'state',
-            'rating',
-            'reviewCount',
-            'logo',
-            'gallery',
-            'featured_image',
-            'address',
-          ]);
+        if (!$gym->featured_image) {
+          $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+          $gym->featured_image = $latestGalleryImage ?: null;
+        }
 
-          return $gym;
-        })
-        ->filter()
-        ->sortByDesc('rating')
-        ->values();
+        $gym->setVisible([
+          'id',
+          'slug',
+          'trending',
+          'name',
+          'description',
+          'city',
+          'state',
+          'rating',
+          'reviewCount',
+          'logo',
+          'gallery',
+          'featured_image',
+          'address',
+        ]);
 
-      $total = $gyms->count();
-      $sliced = $gyms->slice(($page - 1) * $perPage, $perPage)->values();
+        return $gym;
+      })->filter()->values();
 
-      $paginator = new LengthAwarePaginator($sliced, $total, $perPage, $page);
+      $paginator = new LengthAwarePaginator($gyms, $total, $perPage, $page);
 
       $result = $paginator->toArray();
       unset($result['links']);
