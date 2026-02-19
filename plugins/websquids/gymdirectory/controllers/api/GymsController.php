@@ -1338,4 +1338,82 @@ class GymsController extends Controller {
       ], 500);
     }
   }
+
+  /**
+   * GET /api/v1/gyms/next-favourite-gyms
+   * Returns "Best Gyms in {City}" labels for locations related to the active filter.
+   * - If ?state= is provided: returns all city labels within that state.
+   * - If ?city= is provided: finds the state of that city, then returns all city labels in that state.
+   * Supports pagination via ?per_page= and ?page=.
+   */
+  public function nextFavouriteGyms(Request $request) {
+    try {
+      $state = $request->input('state') ? trim($request->input('state')) : '';
+      $city = $request->input('city') ? trim($request->input('city')) : '';
+
+      $perPage = (int) $request->input('per_page', 50);
+      $page = (int) $request->input('page', 1);
+      $perPage = max(1, min(100, $perPage));
+      $page = max(1, $page);
+
+      $labels = [];
+
+      if ($state !== '') {
+        // State filter selected: return all city labels within that state
+        $cityRows = Address::selectRaw('DISTINCT city')
+          ->where('state', $state)
+          ->whereNotNull('city')
+          ->where('city', '!=', '')
+          ->orderBy('city')
+          ->pluck('city');
+
+        foreach ($cityRows as $cityName) {
+          $labels[] = [
+            'label' => 'Best Gyms in ' . $cityName,
+            'type'   => 'city',
+            'filter' => $cityName,
+          ];
+        }
+      } elseif ($city !== '') {
+        // City filter selected: find the state of that city, then return all cities in that state
+        $resolvedState = Address::where('city', 'like', '%' . $city . '%')
+          ->whereNotNull('state')
+          ->where('state', '!=', '')
+          ->value('state');
+
+        if ($resolvedState) {
+          $cityRows = Address::selectRaw('DISTINCT city')
+            ->where('state', $resolvedState)
+            ->whereNotNull('city')
+            ->where('city', '!=', '')
+            ->orderBy('city')
+            ->pluck('city');
+
+          foreach ($cityRows as $cityName) {
+            $labels[] = [
+              'label' => 'Best Gyms in ' . $cityName,
+              'type'   => 'city',
+              'filter' => $cityName,
+            ];
+          }
+        }
+      }
+
+      $total = count($labels);
+      $sliced = array_slice($labels, ($page - 1) * $perPage, $perPage);
+      $paginator = new LengthAwarePaginator($sliced, $total, $perPage, $page);
+      $result = $paginator->toArray();
+      unset($result['links']);
+
+      return response()->json($result);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@nextFavouriteGyms: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString()
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage()
+      ], 500);
+    }
+  }
 }
