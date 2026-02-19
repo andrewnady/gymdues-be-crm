@@ -1,10 +1,13 @@
 columns:
     reviewer:
-        label: Reviwer
+        label: Reviewer
         type: text
     rate:
         label: Rate
         type: number
+    status:
+        label: Status
+        type: text
     text:
         label: Review
         type: text

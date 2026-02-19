@@ -1,6 +1,6 @@
 columns:
     id:
-        label: id
+        label: ID
         type: number
     address:
         label: Address
@@ -8,23 +8,27 @@ columns:
         select: full_address
         relation: address
     reviewer:
-        label: reviewer
+        label: Reviewer
         type: text
-    text:
-        label: text
-        type: text
+        searchable: true
     rate:
-        label: rate
+        label: Rate
         type: number
+    status:
+        label: Status
+        type: text
+    source:
+        label: Source
+        type: text
     reviewed_at:
-        label: reviewed_at
+        label: Reviewed At
         type: text
     created_at:
-        label: created_at
+        label: Created At
         type: datetime
     updated_at:
-        label: updated_at
+        label: Updated At
         type: datetime
     deleted_at:
-        label: deleted_at
+        label: Deleted At
         type: datetime
