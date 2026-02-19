@@ -690,6 +690,7 @@ class GymsController extends Controller {
       $gym->address = $address;
       $gym->addresses_count = $gym->addresses()->count();
       $gym->contacts_count = $gym->contacts()->count();
+      $gym->contacts = $gym->contacts;
 
       return response()->json($gym->toArray());
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
