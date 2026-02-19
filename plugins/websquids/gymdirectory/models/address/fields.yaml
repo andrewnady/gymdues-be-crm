@@ -76,7 +76,6 @@ tabs:
     lazy:
         - pricing
         - hours
-        - reviews
     fields:
         pricing:
             span: full

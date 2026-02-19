@@ -21,6 +21,7 @@ Route::prefix('api/v1')
     Route::get('gyms/{gym_id}/addresses', [GymsController::class, 'addresses']);
     Route::get('addresses/{address_id}', [GymsController::class, 'address']);
     Route::get('gyms/cities-and-states', [GymsController::class, 'citiesAndStates']);
+    Route::get('gyms/highly-rated', [GymsController::class, 'highlyRated']);
     Route::get('gyms/filtered-top-gyms', [GymsController::class, 'filteredTopGyms']);
     Route::get('gyms/next-favourite-gyms', [GymsController::class, 'nextFavouriteGyms']);
     Route::get('gyms/{slug}', [GymsController::class, 'show']);

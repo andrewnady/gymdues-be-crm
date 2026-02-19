@@ -690,6 +690,7 @@ class GymsController extends Controller {
       $gym->address = $address;
       $gym->addresses_count = $gym->addresses()->count();
       $gym->contacts_count = $gym->contacts()->count();
+      $gym->contacts = $gym->contacts;
 
       return response()->json($gym->toArray());
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -1330,6 +1331,99 @@ class GymsController extends Controller {
       return response()->json($result);
     } catch (\Exception $e) {
       Log::error('Error in GymsController@filteredTopGyms: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
+   * GET /api/v1/gyms/highly-rated
+   * Gyms with average rating > 4.5 and 20+ reviews for the homepage.
+   * Supports pagination via ?page= and ?per_page= query params.
+   */
+  public function highlyRated(Request $request) {
+    try {
+      $perPage = (int) $request->input('per_page', 12);
+      $perPage = max(1, min(50, $perPage));
+      $page = (int) $request->input('page', 1);
+      $page = max(1, $page);
+
+      // Use withCount/withAvg so review records are never loaded into memory —
+      // the DB returns only the aggregate values per address row.
+      $addresses = Address::with(['gym' => function ($q) {
+        $q->with(['logo', 'gallery', 'featured_image']);
+      }])
+        ->withCount('reviews')
+        ->withAvg('reviews', 'rate')
+        ->whereHas('gym')
+        ->whereHas('reviews')
+        ->get();
+
+      // Group by gym, compute per-gym weighted average, and filter qualifiers.
+      $gyms = $addresses->groupBy('gym_id')
+        ->map(function ($addrs) {
+          $gym = $addrs->first()->gym;
+          if (!$gym) {
+            return null;
+          }
+
+          // Weighted average across all addresses for this gym
+          $totalReviews = $addrs->sum('reviews_count');
+          $weightedSum = $addrs->sum(fn($a) => $a->reviews_count * (float) $a->reviews_avg_rate);
+          $avgRating = $totalReviews > 0 ? round($weightedSum / $totalReviews, 2) : 0;
+
+          if ($totalReviews < 20 || $avgRating <= 4.5) {
+            return null;
+          }
+
+          $firstAddr = $addrs->first();
+
+          $gym->rating = $avgRating;
+          $gym->reviewCount = $totalReviews;
+          $gym->address = $firstAddr;
+
+          if (!$gym->featured_image) {
+            $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+            $gym->featured_image = $latestGalleryImage ?: null;
+          }
+
+          $gym->setVisible([
+            'id',
+            'slug',
+            'trending',
+            'name',
+            'description',
+            'city',
+            'state',
+            'rating',
+            'reviewCount',
+            'logo',
+            'gallery',
+            'featured_image',
+            'address',
+          ]);
+
+          return $gym;
+        })
+        ->filter()
+        ->sortByDesc('rating')
+        ->values();
+
+      $total = $gyms->count();
+      $sliced = $gyms->slice(($page - 1) * $perPage, $perPage)->values();
+
+      $paginator = new LengthAwarePaginator($sliced, $total, $perPage, $page);
+
+      $result = $paginator->toArray();
+      unset($result['links']);
+
+      return response()->json($result);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@highlyRated: ' . $e->getMessage(), [
         'trace' => $e->getTraceAsString(),
       ]);
       return response()->json([
