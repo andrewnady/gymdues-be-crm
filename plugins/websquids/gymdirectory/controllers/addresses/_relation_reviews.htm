@@ -1,1 +1,81 @@
-<?= $this->relationRender('reviews') ?>
+<?php
+/**
+ * Reviews tab partial for the Address form.
+ *
+ * When the address popup is opened from the Gyms controller, $this->model is
+ * the Gym (not this address). We cannot use $this->relationRender('reviews')
+ * here because it would call Gym->reviews() which only returns reviews for
+ * the primary address.
+ *
+ * Instead we use $model, which the Form widget always passes as the record
+ * being edited — i.e. this specific Address — regardless of which controller
+ * opened the form.
+ */
+
+/** @var \websquids\Gymdirectory\Models\Address $model */
+$address = (isset($model) && $model instanceof \websquids\Gymdirectory\Models\Address)
+    ? $model
+    : null;
+
+// Fallback for popup context where $model may not be set yet
+if (!$address && ($manageId = post('manage_id'))) {
+    $address = \websquids\Gymdirectory\Models\Address::find($manageId);
+}
+?>
+
+<?php if (!$address || !$address->id): ?>
+    <p class="text-muted" style="padding: 10px 0;">
+        Save the address first to view its reviews.
+    </p>
+<?php else: ?>
+    <?php $reviews = $address->reviews()->orderBy('created_at', 'desc')->get(); ?>
+
+    <?php if ($reviews->isEmpty()): ?>
+        <p class="text-muted" style="padding: 10px 0;">No reviews found for this address.</p>
+    <?php else: ?>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Reviewer</th>
+                    <th>Rate</th>
+                    <th>Status</th>
+                    <th>Source</th>
+                    <th>Review</th>
+                    <th style="width:70px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($reviews as $review): ?>
+                <?php
+                    $reviewer   = e($review->reviewer ?: ($review->reviewer_name ?? '—'));
+                    $rate       = $review->rate ?? $review->rating ?? '—';
+                    $status     = $review->status ?? 'approved';
+                    $badgeClass = $status === 'pending'  ? 'badge-warning'
+                                : ($status === 'rejected' ? 'badge-danger' : 'badge-success');
+                    $snippet    = e(\Str::limit(strip_tags($review->text ?? ''), 80));
+                ?>
+                <tr>
+                    <td><?= $reviewer ?></td>
+                    <td><?= e($rate) ?></td>
+                    <td><span class="badge <?= $badgeClass ?>"><?= ucfirst($status) ?></span></td>
+                    <td><?= e($review->source ?? '—') ?></td>
+                    <td><?= $snippet ?></td>
+                    <td>
+                        <a href="<?= Backend::url('websquids/gymdirectory/reviews/update/' . $review->id) ?>"
+                           class="btn btn-xs btn-default"
+                           target="_blank">Edit</a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
+
+    <p style="margin-top: 8px;">
+        <a href="<?= Backend::url('websquids/gymdirectory/reviews') ?>"
+           class="btn btn-default btn-sm"
+           target="_blank">
+            <i class="icon-list"></i> Manage All Reviews
+        </a>
+    </p>
+<?php endif; ?>

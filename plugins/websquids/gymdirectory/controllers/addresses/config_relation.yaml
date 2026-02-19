@@ -22,7 +22,7 @@ reviews:
     label: Reviews
     view:
         list: $/websquids/gymdirectory/models/review/columns.yaml
-        toolbarButtons: create|delete
+        toolbarButtons: create|update|delete
     manage:
         form: $/websquids/gymdirectory/models/review/fields.yaml
 
