@@ -1,1 +1,52 @@
-<?= $this->relationRender('pricing') ?>
+<?php
+/**
+ * Pricing tab partial for the Address form.
+ *
+ * Uses $model (the Address being edited) directly so this works correctly
+ * in both the Gyms popup context and the Addresses controller context.
+ * $this->relationRender('pricing') would call Gym->pricing() in the popup,
+ * which only shows pricing for the primary address.
+ */
+
+/** @var \websquids\Gymdirectory\Models\Address $model */
+$address = (isset($model) && $model instanceof \websquids\Gymdirectory\Models\Address)
+    ? $model
+    : null;
+
+if (!$address && ($manageId = post('manage_id'))) {
+    $address = \websquids\Gymdirectory\Models\Address::find($manageId);
+}
+?>
+
+<?php if (!$address || !$address->id): ?>
+    <p class="text-muted" style="padding: 10px 0;">
+        Save the address first to view pricing.
+    </p>
+<?php else: ?>
+    <?php $tiers = $address->pricing()->orderBy('id', 'asc')->get(); ?>
+
+    <?php if ($tiers->isEmpty()): ?>
+        <p class="text-muted" style="padding: 10px 0;">No pricing tiers found for this address.</p>
+    <?php else: ?>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Tier Name</th>
+                    <th>Price</th>
+                    <th>Frequency</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($tiers as $tier): ?>
+                <tr>
+                    <td><?= e($tier->tier_name ?? '—') ?></td>
+                    <td><?= e($tier->price ?? '—') ?></td>
+                    <td><?= e($tier->frequency ?? '—') ?></td>
+                    <td><?= e(\Str::limit(strip_tags($tier->description ?? ''), 80)) ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
+<?php endif; ?>
