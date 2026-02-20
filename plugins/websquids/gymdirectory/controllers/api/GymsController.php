@@ -1140,6 +1140,10 @@ class GymsController extends Controller {
         'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
       ];
 
+      $fields = $request->input('fields');
+
+      $sitemapsOnly = ($fields === 'sitemaps');
+
       $stateRows = Gym::selectRaw('state, count(*) as count')
         ->whereNotNull('state')
         ->where('state', '!=', '')
@@ -1158,11 +1162,15 @@ class GymsController extends Controller {
         ->whereNotNull('city')
         ->where('city', '!=', '')
         ->groupBy('city')
-        ->orderByDesc('count')
-        ->limit(50)
-        ->get()
+        ->orderByDesc('count');
+      if (!$sitemapsOnly) {
+        $cityRows = $cityRows->limit(50);
+      }
+
+      $cityRows = $cityRows->get()
         ->sortBy('city')
         ->values();
+        
       $cities = $cityRows->map(function ($row) {
         return [
           'city' => $row->city,
