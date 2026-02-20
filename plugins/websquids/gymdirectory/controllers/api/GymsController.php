@@ -1351,6 +1351,110 @@ class GymsController extends Controller {
   }
 
   /**
+   * GET /api/v1/gyms/{slug}/nearby
+   * Get gyms nearby (same postal code), excluding the current gym.
+   * Optional query params: address_id (to pick a specific address), per_page (default 6).
+   */
+  public function nearby($slug, Request $request) {
+    try {
+      $gym = Gym::where('slug', $slug)->first();
+      if (!$gym) {
+        return response()->json([
+          'error' => 'Not found',
+          'message' => 'Gym not found',
+        ], 404);
+      }
+
+      // Determine target address
+      $addressId = $request->input('address_id');
+      $address = null;
+      if ($addressId) {
+        $address = $gym->addresses()->where('id', $addressId)->first();
+      }
+      if (!$address) {
+        $address = $gym->getPrimaryAddress();
+      }
+
+      if (!$address || empty($address->postal_code)) {
+        return response()->json(['data' => []]);
+      }
+
+      $perPage = (int) $request->input('per_page', 6);
+      $perPage = max(1, min(20, $perPage));
+
+      // Find other addresses in the same postal code, excluding this gym
+      $nearbyAddresses = Address::with(['reviews', 'gym' => function ($q) {
+        $q->with(['logo', 'gallery', 'featured_image']);
+      }])
+        ->where('postal_code', $address->postal_code)
+        ->where('gym_id', '!=', $gym->id)
+        ->whereHas('gym')
+        ->get();
+
+      // Group by gym and pick the first (primary) address per gym
+      $nearbyGyms = $nearbyAddresses->groupBy('gym_id')
+        ->map(function ($addrs) {
+          $gymModel = $addrs->first()->gym;
+          if (!$gymModel) {
+            return null;
+          }
+
+          $allRates = $addrs->flatMap(function ($a) {
+            return $a->reviews ? $a->reviews->pluck('rate') : collect();
+          })->filter();
+
+          $reviewCount = $allRates->count();
+          $avgRating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
+
+          $firstAddr = $addrs->sortByDesc('is_primary')->first();
+
+          $gymModel->rating = $avgRating;
+          $gymModel->reviewCount = $reviewCount;
+          $gymModel->address = $firstAddr;
+
+          if ($gymModel->featured_image) {
+            $gymModel->featured_image = $gymModel->featured_image;
+          } else {
+            $latestGalleryImage = $gymModel->gallery ? $gymModel->gallery->sortByDesc('created_at')->first() : null;
+            $gymModel->featured_image = $latestGalleryImage ?: null;
+          }
+
+          $gymModel->setVisible([
+            'id',
+            'slug',
+            'trending',
+            'name',
+            'description',
+            'city',
+            'state',
+            'rating',
+            'reviewCount',
+            'logo',
+            'gallery',
+            'featured_image',
+            'address'
+          ]);
+
+          return $gymModel;
+        })
+        ->filter()
+        ->sortByDesc('rating')
+        ->take($perPage)
+        ->values();
+
+      return response()->json(['data' => $nearbyGyms]);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@nearby: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
    * GET /api/v1/gyms/highly-rated
    * Gyms with average rating > 4.5 and 20+ reviews for the homepage.
    * Supports pagination via ?page= and ?per_page= query params.

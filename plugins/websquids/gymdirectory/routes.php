@@ -23,6 +23,7 @@ Route::prefix('api/v1')
     Route::get('gyms/cities-and-states', [GymsController::class, 'citiesAndStates']);
     Route::get('gyms/highly-rated', [GymsController::class, 'highlyRated']);
     Route::get('gyms/filtered-top-gyms', [GymsController::class, 'filteredTopGyms']);
+    Route::get('gyms/{slug}/nearby', [GymsController::class, 'nearby']);
     Route::get('gyms/{slug}', [GymsController::class, 'show']);
     
     // Reviews routes
