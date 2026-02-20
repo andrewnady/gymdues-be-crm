@@ -1,7 +1,11 @@
 fields:
     trending:
         label: Trending
-        span: full
+        span: auto
+        type: switch
+    is_popular:
+        label: Popular
+        span: auto
         type: switch
     name:
         label: 'websquids.gymdirectory::lang.name'

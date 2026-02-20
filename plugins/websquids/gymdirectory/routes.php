@@ -21,12 +21,14 @@ Route::prefix('api/v1')
     Route::get('gyms/{gym_id}/addresses', [GymsController::class, 'addresses']);
     Route::get('addresses/{address_id}', [GymsController::class, 'address']);
     Route::get('gyms/cities-and-states', [GymsController::class, 'citiesAndStates']);
+    Route::get('gyms/highly-rated', [GymsController::class, 'highlyRated']);
     Route::get('gyms/filtered-top-gyms', [GymsController::class, 'filteredTopGyms']);
     Route::get('gyms/{slug}/nearby', [GymsController::class, 'nearby']);
     Route::get('gyms/{slug}', [GymsController::class, 'show']);
     
     // Reviews routes
     Route::get('reviews', [ReviewsController::class, 'index']);
+    Route::post('reviews', [ReviewsController::class, 'store']);
     Route::get('reviews/{id}', [ReviewsController::class, 'show']);
     
     // Static pages routes

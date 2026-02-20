@@ -1,4 +1,19 @@
 fields:
+    status:
+        label: Approval Status
+        span: auto
+        type: dropdown
+        options:
+            pending: Pending
+            approved: Approved
+            rejected: Rejected
+        comment: Controls whether this review is visible on the site
+    source:
+        label: Source
+        span: auto
+        type: text
+        disabled: true
+        comment: 'google = imported, user = submitted via website'
     reviewed_at:
         label: 'Reviewed At'
         span: full
@@ -8,6 +23,7 @@ fields:
         label: Reviewer
         span: auto
         type: text
+        searchable: true
     rate:
         label: Rate
         span: auto

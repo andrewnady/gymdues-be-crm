@@ -17,6 +17,8 @@ use websquids\Gymdirectory\Models\Hour;
 use websquids\Gymdirectory\Models\Pricing;
 use websquids\Gymdirectory\Models\Review;
 
+use Illuminate\Support\Facades\DB;
+
 class GymsController extends Controller {
   /**
    * Extract domain from URL
@@ -149,6 +151,8 @@ class GymsController extends Controller {
       $fields = $request->input('fields');
       $sitemapOnly = ($fields === 'sitemap');
       $topGymsOnly = ($fields === 'topgyms');
+      $trending = ($request->input('trending') == 'true') ? true : false;
+      $popularGymsOnly = ($request->input('popular') == 'true') ? true : false;
 
       // Get address_id from query if specified (ignored when sitemapOnly)
       $addressId = $request->input('address_id');
@@ -185,7 +189,7 @@ class GymsController extends Controller {
         $addresses = $addrQuery->get()->makeHidden('reviews');
 
         $topGyms = $addresses->groupBy('gym_id')
-          ->map(function ($addrs) {
+          ->map(function ($addrs) use ($state, $city) {
             $gym = $addrs->first()->gym;
             if (!$gym) {
               return null;
@@ -217,6 +221,8 @@ class GymsController extends Controller {
               $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
             }
 
+            $gym->filterType = ($state && $city) ? 'state' : (($state) ? 'state' : 'city');
+
             // Use setVisible to match regular logic
             $gym->setVisible([
               'id',
@@ -231,7 +237,8 @@ class GymsController extends Controller {
               'logo',
               'gallery',
               'featured_image',
-              'address'
+              'address',
+              'filterType',
             ]);
 
             return $gym;
@@ -244,9 +251,70 @@ class GymsController extends Controller {
         return response()->json(['data' => $topGyms]);
       }
 
-      $gyms = Gym::with(['logo', 'gallery', 'addresses'])
-        ->filter($request->all())
-        ->paginate($perPage);
+      if ($popularGymsOnly) {
+        $popularGyms = Gym::with(['logo', 'gallery', 'addresses'])
+          ->where('is_popular', 1)
+          ->limit(5)
+          ->get();
+
+        $popularGyms->transform(function ($gym) use ($addressId) {
+          $address = null;
+          if ($addressId) {
+            $address = $gym->addresses()->where('id', $addressId)->first();
+          }
+          if (!$address) {
+            $address = $gym->getPrimaryAddress();
+          }
+
+          if ($address) {
+            $reviewsCount = $address->reviews()->count();
+            $reviewsAvg = $address->reviews()->avg('rate');
+          } else {
+            $reviewsCount = 0;
+            $reviewsAvg = 0;
+          }
+
+          $gym->rating = $reviewsAvg ? round((float)$reviewsAvg, 2) : 0;
+          $gym->reviewCount = $reviewsCount;
+          $gym->address = $address;
+
+          if ($gym->featured_image) {
+            $gym->featured_image = $gym->featured_image;
+          } else {
+            $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+            $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
+          }
+
+          $gym->setVisible([
+            'id',
+            'slug',
+            'trending',
+            'name',
+            'description',
+            'city',
+            'state',
+            'rating',
+            'reviewCount',
+            'logo',
+            'gallery',
+            'featured_image',
+            'address',
+          ]);
+
+          return $gym;
+        });
+
+        return response()->json(['data' => $popularGyms]);
+      }
+
+      $query = Gym::with(['logo', 'gallery', 'addresses'])
+        ->filter($request->all());
+
+      if ($trending) {
+        $query->where('trending', 1);
+      }
+
+      $gyms = $query->paginate($perPage);
 
       // 2. Transform Data
       $gyms->getCollection()->transform(function ($gym) use ($addressId) {
@@ -624,6 +692,7 @@ class GymsController extends Controller {
       $gym->address = $address;
       $gym->addresses_count = $gym->addresses()->count();
       $gym->contacts_count = $gym->contacts()->count();
+      $gym->contacts = $gym->contacts;
 
       return response()->json($gym->toArray());
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -1071,6 +1140,10 @@ class GymsController extends Controller {
         'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
       ];
 
+      $fields = $request->input('fields');
+
+      $sitemapsOnly = ($fields === 'sitemaps');
+
       $stateRows = Gym::selectRaw('state, count(*) as count')
         ->whereNotNull('state')
         ->where('state', '!=', '')
@@ -1089,11 +1162,15 @@ class GymsController extends Controller {
         ->whereNotNull('city')
         ->where('city', '!=', '')
         ->groupBy('city')
-        ->orderByDesc('count')
-        ->limit(50)
-        ->get()
+        ->orderByDesc('count');
+      if (!$sitemapsOnly) {
+        $cityRows = $cityRows->limit(50);
+      }
+
+      $cityRows = $cityRows->get()
         ->sortBy('city')
         ->values();
+        
       $cities = $cityRows->map(function ($row) {
         return [
           'city' => $row->city,
@@ -1139,11 +1216,21 @@ class GymsController extends Controller {
         'WI' => 'Wisconsin', 'WY' => 'Wyoming', 'DC' => 'District of Columbia',
       ];
 
-      $state = $request->input('state');
-      $stateTrim = $state ? trim($state) : '';
+      $stateInput = $request->input('state');
+      $cityInput = $request->input('city');
 
-      $city = $request->input('city');
-      $cityTrim = $city ? trim($city) : '';
+      // Support multiple values: comma-separated string or array
+      $states = [];
+      if ($stateInput) {
+        $states = is_array($stateInput) ? $stateInput : explode(',', $stateInput);
+        $states = array_filter(array_map('trim', $states), fn($v) => $v !== '');
+      }
+
+      $cities = [];
+      if ($cityInput) {
+        $cities = is_array($cityInput) ? $cityInput : explode(',', $cityInput);
+        $cities = array_filter(array_map('trim', $cities), fn($v) => $v !== '');
+      }
 
       $query = Gym::selectRaw('city, state')
         ->whereNotNull('city')
@@ -1155,21 +1242,25 @@ class GymsController extends Controller {
         ->orderBy('state')
         ->orderBy('city');
 
-      if ($stateTrim !== '') {
-        $query->where(function ($sub) use ($stateTrim, $stateNames) {
-          $sub->where('state', 'like', '%' . $stateTrim . '%');
+      if (!empty($states)) {
+        $query->where(function ($sub) use ($states, $stateNames) {
+          foreach ($states as $stateTrim) {
+            $sub->orWhere('state', 'like', '%' . $stateTrim . '%');
 
-          foreach ($stateNames as $abbr => $fullName) {
-            if (stripos($fullName, $stateTrim) !== false) {
-              $sub->orWhere('state', $abbr);
+            foreach ($stateNames as $abbr => $fullName) {
+              if (stripos($fullName, $stateTrim) !== false) {
+                $sub->orWhere('state', $abbr);
+              }
             }
           }
         });
       }
 
-      if ($cityTrim !== '') {
-        $query->where(function ($sub) use ($cityTrim) {
-          $sub->where('city', 'like', '%' . $cityTrim . '%');
+      if (!empty($cities)) {
+        $query->where(function ($sub) use ($cities) {
+          foreach ($cities as $cityTrim) {
+            $sub->orWhere('city', 'like', '%' . $cityTrim . '%');
+          }
         });
       }
 
@@ -1180,7 +1271,7 @@ class GymsController extends Controller {
 
       $topGyms = [];
 
-      if ($stateTrim !== '' || $cityTrim !== '') {
+      if (!empty($states) || !empty($cities)) {
         // User applied a filter — show matching city/state entries
         $rows = $query->get();
 
@@ -1188,17 +1279,19 @@ class GymsController extends Controller {
         $seenStates = [];
         foreach ($rows as $row) {
           // When state filter is given, include the state label AND all cities in that state
-          if ($stateTrim !== '' && !isset($seenStates[$row->state])) {
+          if (!empty($states) && !isset($seenStates[$row->state])) {
             $seenStates[$row->state] = true;
             $topGyms[] = [
-              'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+              'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+              'type' => 'state',
               'filter' => $row->state,
             ];
           }
           if (!isset($seenCities[$row->city])) {
             $seenCities[$row->city] = true;
             $topGyms[] = [
-              'label' => 'Top 10 Gyms in ' . $row->city,
+              'label' => 'Best Gyms in ' . $row->city,
+              'type' => 'city',
               'filter' => $row->city,
             ];
           }
@@ -1214,7 +1307,8 @@ class GymsController extends Controller {
 
         foreach ($cityRows as $row) {
           $topGyms[] = [
-            'label' => 'Top 10 Gyms in ' . $row->city,
+            'label' => 'Best Gyms in ' . $row->city,
+            'type' => 'city',
             'filter' => $row->city,
           ];
         }
@@ -1228,7 +1322,8 @@ class GymsController extends Controller {
 
         foreach ($stateRows as $row) {
           $topGyms[] = [
-            'label' => 'Top 10 Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+            'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+            'type' => 'state',
             'filter' => $row->state,
           ];
         }
@@ -1350,6 +1445,104 @@ class GymsController extends Controller {
       return response()->json(['data' => $nearbyGyms]);
     } catch (\Exception $e) {
       Log::error('Error in GymsController@nearby: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
+   * GET /api/v1/gyms/highly-rated
+   * Gyms with average rating > 4.5 and 20+ reviews for the homepage.
+   * Supports pagination via ?page= and ?per_page= query params.
+   */
+  public function highlyRated(Request $request) {
+    try {
+      $perPage = (int) $request->input('per_page', 12);
+      $perPage = max(1, min(50, $perPage));
+      $page = (int) $request->input('page', 1);
+      $page = max(1, $page);
+
+      // Aggregate at the DB level: group all reviews across every address of a gym,
+      // filter by >= 20 reviews AND avg > 4.5 — no PHP-level filtering needed.
+      $qualifiers = DB::table('websquids_gymdirectory_addresses as a')
+        ->join('websquids_gymdirectory_reviews as r', 'r.address_id', '=', 'a.id')
+        ->select(
+          'a.gym_id',
+          DB::raw('COUNT(r.id) as total_reviews'),
+          DB::raw('AVG(r.rate)  as avg_rating')
+        )
+        ->groupBy('a.gym_id')
+        ->having('total_reviews', '>=', 20)
+        ->having('avg_rating', '>', 4.5)
+        ->orderByDesc('avg_rating')
+        ->get()
+        ->keyBy('gym_id');
+
+      $total = $qualifiers->count();
+
+      // Paginate the small qualifier list, then load gym details only for that slice.
+      $slicedIds = $qualifiers->forPage($page, $perPage)->keys();
+
+      $gymMap = Gym::with(['logo', 'gallery', 'featured_image'])
+        ->whereIn('id', $slicedIds)
+        ->get()
+        ->keyBy('id');
+
+      // Load one primary address per gym for the response.
+      $addressMap = Address::whereIn('gym_id', $slicedIds)
+        ->orderByRaw('is_primary DESC')
+        ->orderBy('id')
+        ->get()
+        ->groupBy('gym_id')
+        ->map(fn($addrs) => $addrs->first());
+
+      $gyms = $slicedIds->map(function ($gymId) use ($qualifiers, $gymMap, $addressMap) {
+        $gym = $gymMap->get($gymId);
+        if (!$gym) {
+          return null;
+        }
+
+        $row = $qualifiers->get($gymId);
+        $gym->rating = round((float) $row->avg_rating, 2);
+        $gym->reviewCount = (int) $row->total_reviews;
+        $gym->address = $addressMap->get($gymId);
+
+        if (!$gym->featured_image) {
+          $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+          $gym->featured_image = $latestGalleryImage ?: null;
+        }
+
+        $gym->setVisible([
+          'id',
+          'slug',
+          'trending',
+          'name',
+          'description',
+          'city',
+          'state',
+          'rating',
+          'reviewCount',
+          'logo',
+          'gallery',
+          'featured_image',
+          'address',
+        ]);
+
+        return $gym;
+      })->filter()->values();
+
+      $paginator = new LengthAwarePaginator($gyms, $total, $perPage, $page);
+
+      $result = $paginator->toArray();
+      unset($result['links']);
+
+      return response()->json($result);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@highlyRated: ' . $e->getMessage(), [
         'trace' => $e->getTraceAsString(),
       ]);
       return response()->json([

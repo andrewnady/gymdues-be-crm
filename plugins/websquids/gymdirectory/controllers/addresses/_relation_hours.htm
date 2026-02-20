@@ -1,1 +1,66 @@
-<?= $this->relationRender('hours') ?>
+<?php
+/**
+ * Hours tab partial for the Address form.
+ *
+ * Uses $model (the Address being edited) directly so this works correctly
+ * in both the Gyms popup context and the Addresses controller context.
+ * $this->relationRender('hours') would call Gym->hours() in the popup,
+ * which only shows hours for the primary address.
+ */
+
+/** @var \websquids\Gymdirectory\Models\Address $model */
+$address = (isset($model) && $model instanceof \websquids\Gymdirectory\Models\Address)
+    ? $model
+    : null;
+
+if (!$address && ($manageId = post('manage_id'))) {
+    $address = \websquids\Gymdirectory\Models\Address::find($manageId);
+}
+
+$dayLabels = [
+    'monday'    => 'Monday',
+    'tuesday'   => 'Tuesday',
+    'wednesday' => 'Wednesday',
+    'thursday'  => 'Thursday',
+    'friday'    => 'Friday',
+    'saturday'  => 'Saturday',
+    'sunday'    => 'Sunday',
+];
+
+$dayOrder = array_keys($dayLabels);
+?>
+
+<?php if (!$address || !$address->id): ?>
+    <p class="text-muted" style="padding: 10px 0;">
+        Save the address first to view hours.
+    </p>
+<?php else: ?>
+    <?php
+    $hours = $address->hours()
+        ->orderByRaw("FIELD(day, 'monday','tuesday','wednesday','thursday','friday','saturday','sunday')")
+        ->get();
+    ?>
+
+    <?php if ($hours->isEmpty()): ?>
+        <p class="text-muted" style="padding: 10px 0;">No hours found for this address.</p>
+    <?php else: ?>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Day</th>
+                    <th>From</th>
+                    <th>To</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($hours as $hour): ?>
+                <tr>
+                    <td><?= e($dayLabels[$hour->day] ?? ucfirst($hour->day ?? '—')) ?></td>
+                    <td><?= e($hour->from ?? '—') ?></td>
+                    <td><?= e($hour->to ?? '—') ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
+<?php endif; ?>
