@@ -151,7 +151,13 @@ class ProcessBestGymsPage implements ShouldQueue
 
     private function buildSlug(string $city, string $state): string
     {
-        $parts = array_filter([$city, $state]);
-        return Str::slug('best-gyms-in-' . implode('-', $parts));
+        if ($city) {
+            return Str::slug('best-' . $city . '-gyms');
+        } else if ($state) {
+            return Str::slug('best-' . $state . '-gyms');
+        } else {
+            $parts = array_filter([$city, $state]);
+            return Str::slug('best-' . implode('-', $parts) . '-gyms');
+        }
     }
 }

@@ -195,6 +195,7 @@ class GymsController extends Controller {
             'faq_section'    => $page->faq_section,
             'state'          => $page->state,
             'city'           => $page->city,
+            'filterType'     => ($page->state && $page->city) ? 'city' : 'state',
           ],
         ]);
       }
