@@ -110,3 +110,6 @@
 1.0.38:
     - 'Updated table websquids_gymdirectory_gyms - add is_popular field'
     - builder_table_update_websquids_gymdirectory_gyms_10.php
+1.0.39:
+    - 'Created table websquids_gymdirectory_best_gyms_pages for pre-generated Best Gyms pages'
+    - create_best_gyms_pages_table.php
