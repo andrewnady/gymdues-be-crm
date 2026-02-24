@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use websquids\Gymdirectory\Models\Address;
 use websquids\Gymdirectory\Models\BestGymsPage;
+use websquids\Gymdirectory\Services\GeminiService;
 
 class ProcessBestGymsPage implements ShouldQueue
 {
@@ -62,7 +63,58 @@ class ProcessBestGymsPage implements ShouldQueue
         }
     }
 
+    /**
+     * Orchestrates gym selection:
+     *   1. Pulls all qualifying candidates from the DB (≥15 reviews, ≥4.0 rating).
+     *   2. Asks Gemini (with live Google Search grounding) to rank them by
+     *      real-world popularity and return an ordered list of IDs.
+     *   3. Falls back to DB-rating sort when Gemini is unavailable or returns
+     *      no usable results.
+     */
     private function buildTopGymsData(string $state, string $city): array
+    {
+        $candidates = $this->queryCandidateGyms($state, $city);
+
+        if (empty($candidates)) {
+            return [];
+        }
+
+        // Ask Gemini to rank by real-world popularity via Google Search grounding.
+        $gymList   = array_map(fn($g) => ['id' => $g['id'], 'name' => $g['name']], $candidates);
+        $rankedIds = (new GeminiService())->rankGymsForLocation($gymList, $city, $state);
+
+        if (!empty($rankedIds)) {
+            $byId   = collect($candidates)->keyBy('id');
+            $ranked = collect($rankedIds)
+                ->map(fn($id) => $byId->get($id))
+                ->filter()
+                ->take(10)
+                ->values()
+                ->all();
+
+            if (!empty($ranked)) {
+                Log::info("ProcessBestGymsPage: Gemini ranked " . count($ranked) . " gyms for [{$city}, {$state}]");
+                return $ranked;
+            }
+        }
+
+        // Fallback: sort by internal DB rating.
+        Log::info("ProcessBestGymsPage: using DB-rating fallback for [{$city}, {$state}]");
+        return collect($candidates)
+            ->sortByDesc(fn($g) => $g['rating'])
+            ->take(10)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Fetch and serialize all qualifying gym candidates for a location.
+     * Applies the quality gate (≥15 reviews, ≥4.0 avg rating) but does NOT
+     * sort or limit — that is left to the caller.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function queryCandidateGyms(string $state, string $city): array
     {
         $addrQuery = Address::with(['reviews', 'gym' => function ($q) {
             $q->with(['logo', 'gallery', 'featured_image']);
@@ -129,8 +181,6 @@ class ProcessBestGymsPage implements ShouldQueue
                 return $gym->toArray();
             })
             ->filter()
-            ->sortByDesc(fn($gym) => $gym['rating'])
-            ->take(10)
             ->values()
             ->all();
     }
