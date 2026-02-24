@@ -62,7 +62,7 @@ Example output: [42, 7, 15, 3]
 PROMPT;
 
         try {
-            $response = Http::timeout(30)->post(self::ENDPOINT . '?key=' . $apiKey, [
+            $response = Http::timeout(60)->post(self::ENDPOINT . '?key=' . $apiKey, [
                 'contents' => [
                     ['role' => 'user', 'parts' => [['text' => $prompt]]],
                 ],
@@ -91,6 +91,8 @@ PROMPT;
         }
 
         $text = $response->json('candidates.0.content.parts.0.text', '');
+
+        Log::info('Return response', [$response->body()]);
 
         if (empty($text)) {
             Log::warning('GeminiService: Empty response from API', [
