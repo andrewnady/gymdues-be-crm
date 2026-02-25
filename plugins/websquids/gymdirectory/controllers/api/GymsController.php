@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use System\Models\File as FileModel;
 use websquids\Gymdirectory\Models\Address;
-use websquids\Gymdirectory\Models\BestGymsPage;
 use websquids\Gymdirectory\Models\Contact;
 use websquids\Gymdirectory\Models\Faq;
 use websquids\Gymdirectory\Models\Gym;
@@ -173,31 +172,83 @@ class GymsController extends Controller {
       }
 
       if ($topGymsOnly) {
-        $slug = $request->input('slug') ? trim($request->input('slug')) : '';
+        $state = $request->input('state') ? trim($request->input('state')) : '';
+        $city = $request->input('city') ? trim($request->input('city')) : '';
 
-        if ($slug === '') {
-          return response()->json(['data' => [], 'page' => null]);
+        $addrQuery = Address::with(['reviews', 'gym' => function ($q) {
+          $q->with(['logo', 'gallery', 'featured_image']);
+        }])->whereHas('gym');
+
+        if ($state !== '') {
+          $addrQuery->where('state', $state);
+        }
+        if ($city !== '') {
+          $addrQuery->where('city', $city);
         }
 
-        $page = BestGymsPage::where('slug', $slug)->first();
+        $addresses = $addrQuery->get()->makeHidden('reviews');
 
-        if (!$page || empty($page->gyms_data)) {
-          return response()->json(['data' => [], 'page' => null]);
-        }
+        $topGyms = $addresses->groupBy('gym_id')
+          ->map(function ($addrs) use ($state, $city) {
+            $gym = $addrs->first()->gym;
+            if (!$gym) {
+              return null;
+            }
 
-        return response()->json([
-          'data' => $page->gyms_data,
-          'page' => [
-            'title'          => $page->title,
-            'slug'           => $page->slug,
-            'featured_image' => $page->featured_image,
-            'intro_section'  => $page->intro_section,
-            'faq_section'    => $page->faq_section,
-            'state'          => $page->state,
-            'city'           => $page->city,
-            'filterType'     => ($page->state && $page->city) ? 'city' : 'state',
-          ],
-        ]);
+            $allRates = $addrs->flatMap(function ($a) {
+              return $a->reviews ? $a->reviews->pluck('rate') : collect();
+            })->filter();
+
+            $reviewCount = $allRates->count();
+            $avgRating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
+
+            if ($reviewCount < 15 || $avgRating < 4) {
+              return null;
+            }
+
+            $firstAddr = $addrs->first();
+
+            // Set computed properties on gym
+            $gym->rating = $avgRating;
+            $gym->reviewCount = $reviewCount;
+            $gym->address = $firstAddr;
+
+            // Set featured_image logic (same as regular logic)
+            if ($gym->featured_image) {
+              $gym->featured_image = $gym->featured_image;
+            } else {
+              $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+              $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
+            }
+
+            $gym->filterType = ($state && $city) ? 'state' : (($state) ? 'state' : 'city');
+
+            // Use setVisible to match regular logic
+            $gym->setVisible([
+              'id',
+              'slug',
+              'trending',
+              'name',
+              'description',
+              'city',
+              'state',
+              'rating',
+              'reviewCount',
+              'logo',
+              'gallery',
+              'featured_image',
+              'address',
+              'filterType',
+            ]);
+
+            return $gym;
+          })
+          ->filter()
+          ->sortByDesc('rating')
+          ->take(10)
+          ->values();
+
+        return response()->json(['data' => $topGyms]);
       }
 
       if ($popularGymsOnly) {
@@ -1144,17 +1195,8 @@ class GymsController extends Controller {
 
   /**
    * GET /api/v1/gyms/filtered-top-gyms
-   * Returns pre-generated Best Gyms pages from best_gyms_pages table.
-   * Each item includes title, slug, featured_image, state, city, and type (state|city).
-   *
-   * Optional query params:
-   *   ?state=TX            — all pages whose state matches TX (state page + all city pages)
-   *   ?state=TX,CA         — comma-separated or array values
-   *   ?city=Houston        — city pages matching the name
-   *   ?per_page=50         — items per page (default 50, max 100)
-   *   ?page=1              — page number
-   *
-   * No filter applied → all rows returned with pagination.
+   * Filtered top gyms.
+   * Optional ?state= filters by state name&city= filter by city name.
    */
   public function filteredTopGyms(Request $request) {
     try {
@@ -1175,34 +1217,35 @@ class GymsController extends Controller {
       ];
 
       $stateInput = $request->input('state');
-      $cityInput  = $request->input('city');
+      $cityInput = $request->input('city');
 
+      // Support multiple values: comma-separated string or array
       $states = [];
       if ($stateInput) {
         $states = is_array($stateInput) ? $stateInput : explode(',', $stateInput);
-        $states = array_values(array_filter(array_map('trim', $states), fn($v) => $v !== ''));
+        $states = array_filter(array_map('trim', $states), fn($v) => $v !== '');
       }
 
       $cities = [];
       if ($cityInput) {
         $cities = is_array($cityInput) ? $cityInput : explode(',', $cityInput);
-        $cities = array_values(array_filter(array_map('trim', $cities), fn($v) => $v !== ''));
+        $cities = array_filter(array_map('trim', $cities), fn($v) => $v !== '');
       }
 
-      $perPage = (int) $request->input('per_page', 50);
-      $page    = (int) $request->input('page', 1);
-      $perPage = max(1, min(100, $perPage));
-      $page    = max(1, $page);
-
-      $query = BestGymsPage::select(['id', 'title', 'slug', 'featured_image', 'state', 'city'])
-        ->orderByRaw('city IS NULL DESC')
+      $query = Gym::selectRaw('city, state')
+        ->whereNotNull('city')
+        ->where('city', '!=', '')
+        ->whereNotNull('state')
+        ->where('state', '!=', '')
+        ->groupBy('city', 'state')
+        ->orderByRaw('count(DISTINCT id) DESC')
         ->orderBy('state')
         ->orderBy('city');
 
       if (!empty($states)) {
         $query->where(function ($sub) use ($states, $stateNames) {
           foreach ($states as $stateTrim) {
-            $sub->orWhere('state', 'like', $stateTrim);
+            $sub->orWhere('state', 'like', '%' . $stateTrim . '%');
 
             foreach ($stateNames as $abbr => $fullName) {
               if (stripos($fullName, $stateTrim) !== false) {
@@ -1221,19 +1264,76 @@ class GymsController extends Controller {
         });
       }
 
-      $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+      $perPage = (int) $request->input('per_page', 50);
+      $page = (int) $request->input('page', 1);
+      $perPage = max(1, min(100, $perPage));
+      $page = max(1, $page);
 
-      $paginator->getCollection()->transform(function ($row) {
-        return [
-          'id'             => $row->id,
-          'title'          => $row->title,
-          'slug'           => $row->slug,
-          'featured_image' => $row->featured_image,
-          'state'          => $row->state,
-          'city'           => $row->city,
-          'type'           => empty($row->city) ? 'state' : 'city',
-        ];
-      });
+      $topGyms = [];
+
+      if (!empty($states) || !empty($cities)) {
+        // User applied a filter — show matching city/state entries
+        $rows = $query->get();
+
+        $seenCities = [];
+        $seenStates = [];
+        foreach ($rows as $row) {
+          // When state filter is given, include the state label AND all cities in that state
+          if (!empty($states) && !isset($seenStates[$row->state])) {
+            $seenStates[$row->state] = true;
+            $topGyms[] = [
+              'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+              'type' => 'state',
+              'filter' => $row->state,
+            ];
+          }
+          if (!isset($seenCities[$row->city])) {
+            $seenCities[$row->city] = true;
+            $topGyms[] = [
+              'label' => 'Best Gyms in ' . $row->city,
+              'type' => 'city',
+              'filter' => $row->city,
+            ];
+          }
+        }
+      } else {
+        // Default — show a mix of top cities and top states
+        $cityRows = Gym::selectRaw('city, count(DISTINCT id) as count')
+          ->whereNotNull('city')
+          ->where('city', '!=', '')
+          ->groupBy('city')
+          ->orderByDesc('count')
+          ->get();
+
+        foreach ($cityRows as $row) {
+          $topGyms[] = [
+            'label' => 'Best Gyms in ' . $row->city,
+            'type' => 'city',
+            'filter' => $row->city,
+          ];
+        }
+
+        $stateRows = Gym::selectRaw('state, count(DISTINCT id) as count')
+          ->whereNotNull('state')
+          ->where('state', '!=', '')
+          ->groupBy('state')
+          ->orderByDesc('count')
+          ->get();
+
+        foreach ($stateRows as $row) {
+          $topGyms[] = [
+            'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
+            'type' => 'state',
+            'filter' => $row->state,
+          ];
+        }
+      }
+
+      $total = count($topGyms);
+
+      $sliced = array_slice($topGyms, ($page - 1) * $perPage, $perPage);
+
+      $paginator = new LengthAwarePaginator($sliced, $total, $perPage, $page);
 
       $result = $paginator->toArray();
       unset($result['links']);
