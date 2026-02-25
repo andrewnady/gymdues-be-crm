@@ -628,7 +628,7 @@ class GymsController extends Controller {
       // Load related data for the address
       if ($address) {
         $gym->hours = $address->hours;
-        $gym->reviews = $address->reviews;
+        $gym->reviews = $address->reviews()->orderBy('created_at', 'desc')->get();
         $gym->pricing = $address->pricing;
         $gym->rating = $address->reviews()->avg('rate') ? round((float)$address->reviews()->avg('rate'), 2) : 0;
       } else {
