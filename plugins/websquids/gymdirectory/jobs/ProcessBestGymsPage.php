@@ -19,6 +19,7 @@ class ProcessBestGymsPage implements ShouldQueue
     public int $backoff = 60;
 
     public function __construct(
+        private string $country,
         private string $city,
         private string $state,
         private bool   $force = false,
@@ -47,6 +48,7 @@ class ProcessBestGymsPage implements ShouldQueue
             'title'          => $title,
             'slug'           => $slug,
             'gyms_data'      => $gymsData,
+            'country'        => $this->country ?: null,
             'state'          => $this->state ?: null,
             'city'           => $this->city  ?: null,
             'intro_section'  => null,
@@ -80,17 +82,10 @@ class ProcessBestGymsPage implements ShouldQueue
         }
 
         // Ask Gemini to rank by real-world popularity via Google Search grounding.
-        $gymList   = array_map(fn($g) => ['id' => $g['id'], 'name' => $g['name']], $candidates);
-        $rankedIds = (new GeminiService())->rankGymsForLocation($gymList, $city, $state);
+        $rankedIds = (new GeminiService())->rankGymsForLocation($candidates, $city, $state);
 
         if (!empty($rankedIds)) {
-            $byId   = collect($candidates)->keyBy('id');
-            $ranked = collect($rankedIds)
-                ->map(fn($id) => $byId->get($id))
-                ->filter()
-                ->take(10)
-                ->values()
-                ->all();
+            $ranked = $this->fetchTopGyms(array_slice($rankedIds, 0, 10));
 
             if (!empty($ranked)) {
                 Log::info("ProcessBestGymsPage: Gemini ranked " . count($ranked) . " gyms for [{$city}, {$state}]");
@@ -109,16 +104,13 @@ class ProcessBestGymsPage implements ShouldQueue
 
     /**
      * Fetch and serialize all qualifying gym candidates for a location.
-     * Applies the quality gate (≥15 reviews, ≥4.0 avg rating) but does NOT
      * sort or limit — that is left to the caller.
      *
      * @return array<int, array<string, mixed>>
      */
     private function queryCandidateGyms(string $state, string $city): array
     {
-        $addrQuery = Address::with(['reviews', 'gym' => function ($q) {
-            $q->with(['logo', 'gallery', 'featured_image']);
-        }])->whereHas('gym');
+        $addrQuery = Address::with(['gym:id,name'])->whereHas('gym');
 
         if ($state !== '') {
             $addrQuery->where('state', $state);
@@ -127,11 +119,45 @@ class ProcessBestGymsPage implements ShouldQueue
             $addrQuery->where('city', $city);
         }
 
+        return $addrQuery->get()
+            ->groupBy('gym_id')
+            ->map(function ($addrs) {
+                $gym = $addrs->first()->gym;
+                if (!$gym) {
+                    return null;
+                }
+
+                return [
+                    'id'   => $gym->id,
+                    'name' => $gym->name,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Fetch and serialize all qualifying gym candidates for a location.
+     * sort or limit — that is left to the caller.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchTopGyms(array $gymIds): array
+    {
+        $addrQuery = Address::with(['reviews', 'gym' => function ($q) {
+            $q->with(['logo', 'gallery', 'featured_image']);
+        }])->whereHas('gym');
+
+        if (count($gymIds) > 0) {
+            $addrQuery->whereIn('gym.id', $gymIds);
+        }
+
         $addresses = $addrQuery->get()->makeHidden('reviews');
 
         return $addresses
             ->groupBy('gym_id')
-            ->map(function ($addrs) use ($state, $city) {
+            ->map(function ($addrs) {
                 $gym = $addrs->first()->gym;
                 if (!$gym) {
                     return null;
@@ -144,9 +170,9 @@ class ProcessBestGymsPage implements ShouldQueue
                 $reviewCount = $allRates->count();
                 $avgRating   = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
 
-                if ($reviewCount < 15 || $avgRating < 4) {
-                    return null;
-                }
+                // if ($reviewCount < 15 || $avgRating < 4) {
+                //     return null;
+                // }
 
                 $firstAddr = $addrs->first();
 
@@ -158,8 +184,6 @@ class ProcessBestGymsPage implements ShouldQueue
                     $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
                     $gym->featured_image = $latestGalleryImage ?: null;
                 }
-
-                $gym->filterType = ($state && $city) ? 'state' : ($state ? 'state' : 'city');
 
                 $gym->setVisible([
                     'id',
@@ -175,7 +199,6 @@ class ProcessBestGymsPage implements ShouldQueue
                     'gallery',
                     'featured_image',
                     'address',
-                    'filterType',
                 ]);
 
                 return $gym->toArray();

@@ -1,6 +1,7 @@
 <?php namespace websquids\Gymdirectory;
 
 use System\Classes\PluginBase;
+use websquids\Gymdirectory\Console\BatchGenerateBestGymsPages;
 use websquids\Gymdirectory\Console\GenerateBestGymsPages;
 
 class Plugin extends PluginBase
@@ -30,6 +31,7 @@ class Plugin extends PluginBase
     public function register()
     {
         $this->registerConsoleCommand('gymdirectory:generate-best-gyms-pages', GenerateBestGymsPages::class);
+        $this->registerConsoleCommand('gymdirectory:batch-generate-best-gyms-pages', BatchGenerateBestGymsPages::class);
     }
 
 
