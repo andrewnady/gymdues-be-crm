@@ -18,6 +18,7 @@ use websquids\Gymdirectory\Models\Pricing;
 use websquids\Gymdirectory\Models\Review;
 
 use Illuminate\Support\Facades\DB;
+use websquids\Gymdirectory\Models\BestGymsPage;
 
 class GymsController extends Controller {
   /**
@@ -1559,55 +1560,17 @@ class GymsController extends Controller {
    */
   public function filteredStateGyms($state, Request $request) {
     try {
-      // Load gyms in this state with addresses and reviews so we can compute rating/reviewCount.
-      $allGyms = Gym::with(['logo', 'gallery', 'featured_image', 'addresses.reviews'])
-        ->where('state', $state)
-        ->limit(20)
-        ->get();
 
-      // We don't paginate here; just compute stats and then return up to 20 gyms.
-      $gyms = $allGyms->map(function ($gym) {
-        // Aggregate all review scores across all addresses for this gym.
-        $allRates = $gym->addresses
-          ? $gym->addresses->flatMap(function ($addr) {
-            return $addr->reviews ? $addr->reviews->pluck('rate') : collect();
-          })->filter()
-          : collect();
+        $topGyms = BestGymsPage::query()
+          ->where('state', $state)
+          ->get()
+          ->pluck('gyms_data')
+          ->flatten(1) 
+          ->sortByDesc('rating') 
+          ->values()
+          ->take(20);
 
-        $reviewCount = $allRates->count();
-        $avgRating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
-
-        $gym->rating = $avgRating;
-        $gym->reviewCount = $reviewCount;
-
-        if (!$gym->featured_image) {
-          $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
-          $gym->featured_image = $latestGalleryImage ?: null;
-        }
-
-        $gym->setVisible([
-          'id',
-          'slug',
-          'trending',
-          'name',
-          'description',
-          'city',
-          'state',
-          'rating',
-          'reviewCount',
-          'logo',
-          'gallery',
-          'featured_image',
-        ]);
-
-        return $gym;
-      })
-        ->filter()
-        ->sortByDesc('rating')
-        ->take(20)
-        ->values();
-
-        $paginator = new LengthAwarePaginator($gyms, $gyms->count(), $gyms->count(), 1);
+        $paginator = new LengthAwarePaginator($topGyms, $topGyms->count(), $topGyms->count(), 1);
 
         $result = $paginator->toArray();
         unset($result['links']);
