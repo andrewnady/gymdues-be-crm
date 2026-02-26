@@ -69,6 +69,18 @@ class Plugin extends PluginBase
                         'url' => \Backend::url('websquids/gymdirectory/newslettersubscriptions'),
                         'permissions' => ['websquids.gymdirectory.manage_newsletter_subscriptions'],
                     ],
+                    'reviews' => [
+                        'label' => 'Reviews',
+                        'icon' => 'icon-star',
+                        'url' => \Backend::url('websquids/gymdirectory/reviews'),
+                        'permissions' => ['websquids.gymdirectory.manage_gyms'],
+                    ],
+                    'bestgymspages' => [
+                        'label' => 'Best Gyms Pages',
+                        'icon' => 'icon-trophy',
+                        'url' => \Backend::url('websquids/gymdirectory/bestgymspages'),
+                        'permissions' => ['websquids.gymdirectory.manage_gyms'],
+                    ],
                 ],
             ],
         ];

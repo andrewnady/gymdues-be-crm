@@ -1,0 +1,38 @@
+fields:
+    _page_info:
+        label: Page Info
+        type: section
+        comment: These fields are read-only. Only the featured image can be edited.
+    title:
+        label: Title
+        span: full
+        type: text
+        disabled: true
+    slug:
+        label: Slug
+        span: auto
+        type: text
+        disabled: true
+    city:
+        label: City
+        span: auto
+        type: text
+        disabled: true
+    state:
+        label: State
+        span: auto
+        type: text
+        disabled: true
+    country:
+        label: Country
+        span: auto
+        type: text
+        disabled: true
+    _image_section:
+        label: Featured Image
+        type: section
+    featured_image:
+        label: Featured Image
+        span: full
+        type: mediafinder
+        mode: image

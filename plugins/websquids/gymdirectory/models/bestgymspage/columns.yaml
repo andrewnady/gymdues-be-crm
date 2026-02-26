@@ -1,0 +1,29 @@
+columns:
+    id:
+        label: ID
+        type: number
+        sortable: true
+    title:
+        label: Title
+        type: text
+        sortable: true
+        searchable: true
+    slug:
+        label: Slug
+        type: text
+        searchable: true
+    city:
+        label: City
+        type: text
+        sortable: true
+        searchable: true
+    state:
+        label: State
+        type: text
+        sortable: true
+        searchable: true
+    country:
+        label: Country
+        type: text
+        sortable: true
+        searchable: true
