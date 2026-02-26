@@ -18,6 +18,7 @@ use websquids\Gymdirectory\Models\Pricing;
 use websquids\Gymdirectory\Models\Review;
 
 use Illuminate\Support\Facades\DB;
+use websquids\Gymdirectory\Models\BestGymsPage;
 
 class GymsController extends Controller {
   /**
@@ -1217,35 +1218,34 @@ class GymsController extends Controller {
       ];
 
       $stateInput = $request->input('state');
-      $cityInput = $request->input('city');
+      $cityInput  = $request->input('city');
 
-      // Support multiple values: comma-separated string or array
       $states = [];
       if ($stateInput) {
         $states = is_array($stateInput) ? $stateInput : explode(',', $stateInput);
-        $states = array_filter(array_map('trim', $states), fn($v) => $v !== '');
+        $states = array_values(array_filter(array_map('trim', $states), fn($v) => $v !== ''));
       }
 
       $cities = [];
       if ($cityInput) {
         $cities = is_array($cityInput) ? $cityInput : explode(',', $cityInput);
-        $cities = array_filter(array_map('trim', $cities), fn($v) => $v !== '');
+        $cities = array_values(array_filter(array_map('trim', $cities), fn($v) => $v !== ''));
       }
 
-      $query = Gym::selectRaw('city, state')
-        ->whereNotNull('city')
-        ->where('city', '!=', '')
-        ->whereNotNull('state')
-        ->where('state', '!=', '')
-        ->groupBy('city', 'state')
-        ->orderByRaw('count(DISTINCT id) DESC')
+      $perPage = (int) $request->input('per_page', 50);
+      $page    = (int) $request->input('page', 1);
+      $perPage = max(1, min(100, $perPage));
+      $page    = max(1, $page);
+
+      $query = BestGymsPage::select(['id', 'title', 'slug', 'featured_image', 'state', 'city'])
+        ->orderByRaw('city IS NULL DESC')
         ->orderBy('state')
         ->orderBy('city');
 
       if (!empty($states)) {
         $query->where(function ($sub) use ($states, $stateNames) {
           foreach ($states as $stateTrim) {
-            $sub->orWhere('state', 'like', '%' . $stateTrim . '%');
+            $sub->orWhere('state', 'like', $stateTrim);
 
             foreach ($stateNames as $abbr => $fullName) {
               if (stripos($fullName, $stateTrim) !== false) {
@@ -1264,76 +1264,19 @@ class GymsController extends Controller {
         });
       }
 
-      $perPage = (int) $request->input('per_page', 50);
-      $page = (int) $request->input('page', 1);
-      $perPage = max(1, min(100, $perPage));
-      $page = max(1, $page);
+      $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
-      $topGyms = [];
-
-      if (!empty($states) || !empty($cities)) {
-        // User applied a filter — show matching city/state entries
-        $rows = $query->get();
-
-        $seenCities = [];
-        $seenStates = [];
-        foreach ($rows as $row) {
-          // When state filter is given, include the state label AND all cities in that state
-          if (!empty($states) && !isset($seenStates[$row->state])) {
-            $seenStates[$row->state] = true;
-            $topGyms[] = [
-              'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
-              'type' => 'state',
-              'filter' => $row->state,
-            ];
-          }
-          if (!isset($seenCities[$row->city])) {
-            $seenCities[$row->city] = true;
-            $topGyms[] = [
-              'label' => 'Best Gyms in ' . $row->city,
-              'type' => 'city',
-              'filter' => $row->city,
-            ];
-          }
-        }
-      } else {
-        // Default — show a mix of top cities and top states
-        $cityRows = Gym::selectRaw('city, count(DISTINCT id) as count')
-          ->whereNotNull('city')
-          ->where('city', '!=', '')
-          ->groupBy('city')
-          ->orderByDesc('count')
-          ->get();
-
-        foreach ($cityRows as $row) {
-          $topGyms[] = [
-            'label' => 'Best Gyms in ' . $row->city,
-            'type' => 'city',
-            'filter' => $row->city,
-          ];
-        }
-
-        $stateRows = Gym::selectRaw('state, count(DISTINCT id) as count')
-          ->whereNotNull('state')
-          ->where('state', '!=', '')
-          ->groupBy('state')
-          ->orderByDesc('count')
-          ->get();
-
-        foreach ($stateRows as $row) {
-          $topGyms[] = [
-            'label' => 'Best Gyms in ' . ($stateNames[$row->state] ?? $row->state),
-            'type' => 'state',
-            'filter' => $row->state,
-          ];
-        }
-      }
-
-      $total = count($topGyms);
-
-      $sliced = array_slice($topGyms, ($page - 1) * $perPage, $perPage);
-
-      $paginator = new LengthAwarePaginator($sliced, $total, $perPage, $page);
+      $paginator->getCollection()->transform(function ($row) {
+        return [
+          'id'             => $row->id,
+          'title'          => $row->title,
+          'slug'           => $row->slug,
+          'featured_image' => $row->featured_image,
+          'state'          => $row->state,
+          'city'           => $row->city,
+          'type'           => empty($row->city) ? 'state' : 'city',
+        ];
+      });
 
       $result = $paginator->toArray();
       unset($result['links']);
