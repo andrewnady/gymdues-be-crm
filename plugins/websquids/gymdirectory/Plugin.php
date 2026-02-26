@@ -1,6 +1,8 @@
 <?php namespace websquids\Gymdirectory;
 
 use System\Classes\PluginBase;
+use websquids\Gymdirectory\Console\BatchGenerateBestGymsPages;
+use websquids\Gymdirectory\Console\GenerateBestGymsPages;
 
 class Plugin extends PluginBase
 {
@@ -24,6 +26,12 @@ class Plugin extends PluginBase
 
     public function registerSettings()
     {
+    }
+
+    public function register()
+    {
+        $this->registerConsoleCommand('gymdirectory:generate-best-gyms-pages', GenerateBestGymsPages::class);
+        $this->registerConsoleCommand('gymdirectory:batch-generate-best-gyms-pages', BatchGenerateBestGymsPages::class);
     }
 
 
@@ -60,6 +68,18 @@ class Plugin extends PluginBase
                         'icon' => 'icon-envelope-o',
                         'url' => \Backend::url('websquids/gymdirectory/newslettersubscriptions'),
                         'permissions' => ['websquids.gymdirectory.manage_newsletter_subscriptions'],
+                    ],
+                    'reviews' => [
+                        'label' => 'Reviews',
+                        'icon' => 'icon-star',
+                        'url' => \Backend::url('websquids/gymdirectory/reviews'),
+                        'permissions' => ['websquids.gymdirectory.manage_gyms'],
+                    ],
+                    'bestgymspages' => [
+                        'label' => 'Best Gyms Pages',
+                        'icon' => 'icon-trophy',
+                        'url' => \Backend::url('websquids/gymdirectory/bestgymspages'),
+                        'permissions' => ['websquids.gymdirectory.manage_gyms'],
                     ],
                 ],
             ],
