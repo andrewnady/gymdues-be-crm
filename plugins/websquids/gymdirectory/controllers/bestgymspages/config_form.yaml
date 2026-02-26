@@ -1,0 +1,7 @@
+name: Best Gyms Page
+form: $/websquids/gymdirectory/models/bestgymspage/fields.yaml
+modelClass: websquids\Gymdirectory\Models\BestGymsPage
+defaultRedirect: websquids/gymdirectory/bestgymspages
+update:
+    redirect: websquids/gymdirectory/bestgymspages
+    redirectClose: websquids/gymdirectory/bestgymspages

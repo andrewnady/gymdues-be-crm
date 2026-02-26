@@ -1,0 +1,11 @@
+list: $/websquids/gymdirectory/models/bestgymspage/columns.yaml
+modelClass: websquids\Gymdirectory\Models\BestGymsPage
+title: Best Gyms Pages
+noRecordsMessage: 'backend::lang.list.no_records'
+showSetup: true
+showCheckboxes: false
+recordsPerPage: 20
+toolbar:
+    search:
+        prompt: 'backend::lang.list.search_prompt'
+recordUrl: 'websquids/gymdirectory/bestgymspages/update/:id'
