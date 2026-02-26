@@ -118,13 +118,10 @@ class BatchProcessBestGymsPages implements ShouldQueue
             $gymsData = $this->fetchTopGyms(array_slice($rankedIds, 0, 10));
             Log::info("BatchProcessBestGymsPages: Gemini ranked " . count($gymsData) . " gyms for [{$city}, {$state}]");
         } else {
-            // Fallback: sort by internal DB rating.
+            // Fallback: fetch top 10 gyms with 15+ reviews and 4+ rating from DB.
             Log::info("BatchProcessBestGymsPages: using DB-rating fallback for [{$city}, {$state}]");
-            $gymsData = collect($batch['gyms'])
-                ->sortByDesc(fn($g) => $g['rating'] ?? 0)
-                ->take(10)
-                ->values()
-                ->all();
+            $gymsData = $this->fetchQualifyingGyms($state, $city);
+            Log::info("BatchProcessBestGymsPages: DB fallback returned " . count($gymsData) . " qualifying gyms for [{$city}, {$state}]");
         }
 
         if (empty($gymsData)) {
@@ -239,6 +236,68 @@ class BatchProcessBestGymsPages implements ShouldQueue
                 return $gym->toArray();
             })
             ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Fetch top 10 gyms for a location filtered to 15+ reviews and 4.0+ average rating,
+     * sorted by rating descending. Used as the AI-ranking fallback.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchQualifyingGyms(string $state, string $city): array
+    {
+        $query = Address::with(['reviews', 'gym' => function ($q) {
+            $q->with(['logo', 'gallery', 'featured_image']);
+        }])->whereHas('gym');
+
+        if ($state !== '') {
+            $query->where('state', $state);
+        }
+        if ($city !== '') {
+            $query->where('city', $city);
+        }
+
+        $addresses = $query->get()->makeHidden('reviews');
+
+        return $addresses
+            ->groupBy('gym_id')
+            ->map(function ($addrs) {
+                $gym = $addrs->first()->gym;
+                if (!$gym) return null;
+
+                $allRates = $addrs->flatMap(function ($a) {
+                    return $a->reviews ? $a->reviews->pluck('rate') : collect();
+                })->filter();
+
+                $reviewCount = $allRates->count();
+                $avgRating   = $allRates->isNotEmpty() ? (float) $allRates->avg() : 0;
+
+                if ($reviewCount < 15 || $avgRating < 4.0) {
+                    return null;
+                }
+
+                $gym->rating      = round($avgRating, 2);
+                $gym->reviewCount = $reviewCount;
+                $gym->address     = $addrs->first();
+
+                if (!$gym->featured_image) {
+                    $gym->featured_image = $gym->gallery
+                        ? $gym->gallery->sortByDesc('created_at')->first()
+                        : null;
+                }
+
+                $gym->setVisible([
+                    'id', 'slug', 'trending', 'name', 'description', 'city', 'state',
+                    'rating', 'reviewCount', 'logo', 'gallery', 'featured_image', 'address',
+                ]);
+
+                return $gym->toArray();
+            })
+            ->filter()
+            ->sortByDesc(fn($g) => $g['rating'])
+            ->take(10)
             ->values()
             ->all();
     }
