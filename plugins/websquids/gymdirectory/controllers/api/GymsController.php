@@ -1553,6 +1553,78 @@ class GymsController extends Controller {
   }
 
   /**
+   * GET /api/v1/gyms/filter-state/{state}
+   * Gyms filter by state for the homepage.
+   * Supports pagination via ?page= and ?per_page= query params.
+   */
+  public function filteredStateGyms($state, Request $request) {
+    try {
+      // Load gyms in this state with addresses and reviews so we can compute rating/reviewCount.
+      $allGyms = Gym::with(['logo', 'gallery', 'featured_image', 'addresses.reviews'])
+        ->where('state', $state)
+        ->limit(20)
+        ->get();
+
+      // We don't paginate here; just compute stats and then return up to 20 gyms.
+      $gyms = $allGyms->map(function ($gym) {
+        // Aggregate all review scores across all addresses for this gym.
+        $allRates = $gym->addresses
+          ? $gym->addresses->flatMap(function ($addr) {
+            return $addr->reviews ? $addr->reviews->pluck('rate') : collect();
+          })->filter()
+          : collect();
+
+        $reviewCount = $allRates->count();
+        $avgRating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
+
+        $gym->rating = $avgRating;
+        $gym->reviewCount = $reviewCount;
+
+        if (!$gym->featured_image) {
+          $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
+          $gym->featured_image = $latestGalleryImage ?: null;
+        }
+
+        $gym->setVisible([
+          'id',
+          'slug',
+          'trending',
+          'name',
+          'description',
+          'city',
+          'state',
+          'rating',
+          'reviewCount',
+          'logo',
+          'gallery',
+          'featured_image',
+        ]);
+
+        return $gym;
+      })
+        ->filter()
+        ->sortByDesc('rating')
+        ->take(20)
+        ->values();
+
+        $paginator = new LengthAwarePaginator($gyms, $gyms->count(), $gyms->count(), 1);
+
+        $result = $paginator->toArray();
+        unset($result['links']);
+  
+        return response()->json($result);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@filteredStateGyms: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
    * GET /api/v1/gyms/next-favourite-gyms
    * Returns "Best Gyms in {City}" labels for locations related to the active filter.
    * - If ?state= is provided: returns all city labels within that state.
