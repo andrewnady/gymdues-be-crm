@@ -173,83 +173,31 @@ class GymsController extends Controller {
       }
 
       if ($topGymsOnly) {
-        $state = $request->input('state') ? trim($request->input('state')) : '';
-        $city = $request->input('city') ? trim($request->input('city')) : '';
+        $slug = $request->input('slug') ? trim($request->input('slug')) : '';
 
-        $addrQuery = Address::with(['reviews', 'gym' => function ($q) {
-          $q->with(['logo', 'gallery', 'featured_image']);
-        }])->whereHas('gym');
-
-        if ($state !== '') {
-          $addrQuery->where('state', $state);
-        }
-        if ($city !== '') {
-          $addrQuery->where('city', $city);
+        if ($slug === '') {
+          return response()->json(['data' => [], 'page' => null]);
         }
 
-        $addresses = $addrQuery->get()->makeHidden('reviews');
+        $page = BestGymsPage::where('slug', $slug)->first();
 
-        $topGyms = $addresses->groupBy('gym_id')
-          ->map(function ($addrs) use ($state, $city) {
-            $gym = $addrs->first()->gym;
-            if (!$gym) {
-              return null;
-            }
+        if (!$page || empty($page->gyms_data)) {
+          return response()->json(['data' => [], 'page' => null]);
+        }
 
-            $allRates = $addrs->flatMap(function ($a) {
-              return $a->reviews ? $a->reviews->pluck('rate') : collect();
-            })->filter();
-
-            $reviewCount = $allRates->count();
-            $avgRating = $allRates->isNotEmpty() ? round((float) $allRates->avg(), 2) : 0;
-
-            if ($reviewCount < 15 || $avgRating < 4) {
-              return null;
-            }
-
-            $firstAddr = $addrs->first();
-
-            // Set computed properties on gym
-            $gym->rating = $avgRating;
-            $gym->reviewCount = $reviewCount;
-            $gym->address = $firstAddr;
-
-            // Set featured_image logic (same as regular logic)
-            if ($gym->featured_image) {
-              $gym->featured_image = $gym->featured_image;
-            } else {
-              $latestGalleryImage = $gym->gallery ? $gym->gallery->sortByDesc('created_at')->first() : null;
-              $gym->featured_image = $latestGalleryImage ? $latestGalleryImage : null;
-            }
-
-            $gym->filterType = ($state && $city) ? 'state' : (($state) ? 'state' : 'city');
-
-            // Use setVisible to match regular logic
-            $gym->setVisible([
-              'id',
-              'slug',
-              'trending',
-              'name',
-              'description',
-              'city',
-              'state',
-              'rating',
-              'reviewCount',
-              'logo',
-              'gallery',
-              'featured_image',
-              'address',
-              'filterType',
-            ]);
-
-            return $gym;
-          })
-          ->filter()
-          ->sortByDesc('rating')
-          ->take(10)
-          ->values();
-
-        return response()->json(['data' => $topGyms]);
+        return response()->json([
+          'data' => $page->gyms_data,
+          'page' => [
+            'title'          => $page->title,
+            'slug'           => $page->slug,
+            'featured_image' => $page->featured_image,
+            'intro_section'  => $page->intro_section,
+            'faq_section'    => $page->faq_section,
+            'state'          => $page->state,
+            'city'           => $page->city,
+            'filterType'     => ($page->state && $page->city) ? 'city' : 'state',
+          ],
+        ]);
       }
 
       if ($popularGymsOnly) {
