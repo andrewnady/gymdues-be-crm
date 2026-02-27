@@ -1444,6 +1444,40 @@ class GymsController extends Controller {
   }
 
   /**
+   * GET /api/v1/gyms/filter-state/{state}
+   * Gyms filter by state for the homepage.
+   * Supports pagination via ?page= and ?per_page= query params.
+   */
+  public function filteredStateGyms($state, Request $request) {
+    try {
+
+        $topGyms = BestGymsPage::query()
+          ->where('state', $state)
+          ->get()
+          ->pluck('gyms_data')
+          ->flatten(1) 
+          ->sortByDesc('rating') 
+          ->values()
+          ->take(20);
+
+        $paginator = new LengthAwarePaginator($topGyms, $topGyms->count(), $topGyms->count(), 1);
+
+        $result = $paginator->toArray();
+        unset($result['links']);
+  
+        return response()->json($result);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@filteredStateGyms: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
+  /**
    * GET /api/v1/gyms/next-favourite-gyms
    * Returns "Best Gyms in {City}" labels for locations related to the active filter.
    * - If ?state= is provided: returns all city labels within that state.
