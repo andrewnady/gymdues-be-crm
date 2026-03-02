@@ -85,7 +85,7 @@ class ProcessBestGymsPage implements ShouldQueue
         $rankedIds = (new GeminiService())->rankGymsForLocation($candidates, $city, $state);
 
         if (!empty($rankedIds)) {
-            $ranked = $this->fetchTopGyms(array_slice($rankedIds, 0, 10));
+            $ranked = $this->fetchTopGyms(array_slice($rankedIds, 0, 10), $state, $city);
 
             if (!empty($ranked)) {
                 Log::info("ProcessBestGymsPage: Gemini ranked " . count($ranked) . " gyms for [{$city}, {$state}]");
@@ -143,14 +143,18 @@ class ProcessBestGymsPage implements ShouldQueue
      *
      * @return array<int, array<string, mixed>>
      */
-    private function fetchTopGyms(array $gymIds): array
+    private function fetchTopGyms(array $gymIds, string $state = '', string $city = ''): array
     {
         $addrQuery = Address::with(['reviews', 'gym' => function ($q) {
             $q->with(['logo', 'gallery', 'featured_image']);
-        }])->whereHas('gym');
+        }])->whereHas('gym')
+            ->whereIn('gym_id', $gymIds);
 
-        if (count($gymIds) > 0) {
-            $addrQuery->whereIn('gym.id', $gymIds);
+        if ($state !== '') {
+            $addrQuery->where('state', $state);
+        }
+        if ($city !== '') {
+            $addrQuery->where('city', $city);
         }
 
         $addresses = $addrQuery->get()->makeHidden('reviews');
