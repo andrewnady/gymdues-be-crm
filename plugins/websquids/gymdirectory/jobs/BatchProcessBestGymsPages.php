@@ -115,7 +115,7 @@ class BatchProcessBestGymsPages implements ShouldQueue
         $rankedIds = $rankedIndex[$key] ?? [];
 
         if (!empty($rankedIds)) {
-            $gymsData = $this->fetchTopGyms(array_slice($rankedIds, 0, 10));
+            $gymsData = $this->fetchTopGyms(array_slice($rankedIds, 0, 10), $state, $city);
             Log::info("BatchProcessBestGymsPages: Gemini ranked " . count($gymsData) . " gyms for [{$city}, {$state}]");
         } else {
             // Fallback: fetch top 10 gyms with 15+ reviews and 4+ rating from DB.
@@ -194,19 +194,26 @@ class BatchProcessBestGymsPages implements ShouldQueue
      *
      * @return array<int, array<string, mixed>>
      */
-    private function fetchTopGyms(array $gymIds): array
+    private function fetchTopGyms(array $gymIds, string $state = '', string $city = ''): array
     {
         if (empty($gymIds)) {
             return [];
         }
 
-        $addresses = Address::with(['reviews', 'gym' => function ($q) {
+        $query = Address::with(['reviews', 'gym' => function ($q) {
             $q->with(['logo', 'gallery', 'featured_image']);
         }])
             ->whereHas('gym')
-            ->whereIn('gym_id', $gymIds)
-            ->get()
-            ->makeHidden('reviews');
+            ->whereIn('gym_id', $gymIds);
+
+        if ($state !== '') {
+            $query->where('state', $state);
+        }
+        if ($city !== '') {
+            $query->where('city', $city);
+        }
+
+        $addresses = $query->get()->makeHidden('reviews');
 
         return $addresses
             ->groupBy('gym_id')
