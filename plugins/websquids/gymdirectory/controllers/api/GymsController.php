@@ -1554,4 +1554,21 @@ class GymsController extends Controller {
       ], 500);
     }
   }
+
+  public function bestGymsSitemap(){
+    try{
+      $bestGyms = BestGymsPage::all()->pluck('slug');
+      $data = array('data'=> $bestGyms);
+      return response()->json($data);
+    }catch(\Exception $e){
+
+      Log::error('Error in GymsController@bestGymsSitemap: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+        ]);
+      return response()->json([
+        'error' => 'Internal server error',
+        'message' => $e->getMessage(),
+        ], 500);
+    }
+  }
 }

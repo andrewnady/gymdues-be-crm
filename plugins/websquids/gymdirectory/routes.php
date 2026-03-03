@@ -13,6 +13,7 @@ use Websquids\Gymdirectory\Controllers\Api\CommentsController;
 Route::prefix('api/v1')
   ->middleware([ApiKeyMiddleware::class])
   ->group(function () {
+    Route::get('best-gyms-sitemaps', [GymsController::class, 'bestGymsSitemap']);
     Route::get('gyms', [GymsController::class, 'index']);
     Route::post('gyms', [GymsController::class, 'store']);
     Route::get('gyms/addresses-by-location', [GymsController::class, 'addressesByLocation']);
