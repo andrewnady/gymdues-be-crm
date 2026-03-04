@@ -1555,6 +1555,67 @@ class GymsController extends Controller {
     }
   }
 
+  public function popularGymsStateCity()
+  {
+    $locations = [
+      ['city' => null,            'state' => 'New York'],
+      ['city' => 'Los Angeles',   'state' => 'California'],
+      ['city' => 'Chicago',       'state' => 'Illinois'],
+      ['city' => 'Houston',       'state' => 'Texas'],
+      ['city' => 'Phoenix',       'state' => 'Arizona'],
+      ['city' => 'Philadelphia',  'state' => 'Pennsylvania'],
+      ['city' => 'San Antonio',   'state' => 'Texas'],
+      ['city' => 'San Diego',     'state' => 'California'],
+      ['city' => 'Dallas',        'state' => 'Texas'],
+      ['city' => 'San Jose',      'state' => 'California'],
+      ['city' => 'Austin',        'state' => 'Texas'],
+      ['city' => 'San Francisco', 'state' => 'California'],
+      ['city' => 'Miami',         'state' => 'Florida'],
+      ['city' => 'Las Vegas',     'state' => 'Nevada'],
+      ['city' => 'Seattle',       'state' => 'Washington'],
+      ['city' => 'Denver',        'state' => 'Colorado'],
+      ['city' => 'Washington',    'state' => 'District of Columbia'],
+      ['city' => 'Boston',        'state' => 'Massachusetts'],
+      ['city' => 'Atlanta',       'state' => 'Georgia'],
+      ['city' => 'Orlando',       'state' => 'Florida'],
+    ];
+
+    try {
+      $results = [];
+
+      foreach ($locations as $location) {
+        $query = BestGymsPage::select(['title', 'slug', 'featured_image', 'state', 'city'])
+          ->where('state', $location['state']);
+
+        if ($location['city'] === null) {
+          $query->whereNull('city');
+        } else {
+          $query->where('city', $location['city']);
+        }
+
+        $page = $query->first();
+
+        if ($page) {
+          $results[] = [
+            'title'          => $page->title,
+            'slug'           => $page->slug,
+            'featured_image' => $page->featured_image,
+          ];
+        }
+      }
+
+      return response()->json(['data' => $results]);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@popularGymsStateCity: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error'   => 'Internal server error',
+        'message' => $e->getMessage(),
+      ], 500);
+    }
+  }
+
   public function bestGymsSitemap(){
     try{
       $bestGyms = BestGymsPage::all()->pluck('slug');
