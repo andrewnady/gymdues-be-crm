@@ -116,3 +116,9 @@
 1.0.40:
     - 'Updated table websquids_gymdirectory_best_gyms_pages - remove country_id, state_id, city_id; add country column after gyms_data'
     - update_best_gyms_pages_replace_ids_with_country.php
+1.0.41:
+    - 'Created normalized gyms table for CSV import'
+    - create_gyms_normalized_table.php
+1.0.42:
+    - 'Created normalized addresses table for CSV import'
+    - create_addresses_normalized_table.php
