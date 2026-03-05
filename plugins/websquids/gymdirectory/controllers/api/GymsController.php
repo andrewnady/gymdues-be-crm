@@ -1444,28 +1444,24 @@ class GymsController extends Controller {
   }
 
   /**
-   * GET /api/v1/gyms/filter-state/{state}
-   * Gyms filter by state for the homepage.
+   * GET /api/v1/gyms/filter-state
+   * Gyms filter by slug for the homepage.
    * Supports pagination via ?page= and ?per_page= query params.
    */
-  public function filteredStateGyms($state, Request $request) {
+  public function filteredStateGyms(Request $request) {
     try {
+        $slug = $request->input('slug');
+        
+        $page = BestGymsPage::where('slug', $slug)
+          ->first();
 
-        $topGyms = BestGymsPage::query()
-          ->where('state', $state)
-          ->get()
-          ->pluck('gyms_data')
-          ->flatten(1) 
-          ->sortByDesc('rating') 
-          ->values()
-          ->take(20);
+        if (!$page || empty($page->gyms_data)) {
+          return response()->json(['data' => [], 'page' => null]);
+        }
 
-        $paginator = new LengthAwarePaginator($topGyms, $topGyms->count(), $topGyms->count(), 1);
-
-        $result = $paginator->toArray();
-        unset($result['links']);
-  
-        return response()->json($result);
+        return response()->json([
+          'data' => $page->gyms_data,
+        ]);
     } catch (\Exception $e) {
       Log::error('Error in GymsController@filteredStateGyms: ' . $e->getMessage(), [
         'trace' => $e->getTraceAsString(),
