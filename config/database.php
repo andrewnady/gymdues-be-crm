@@ -7,9 +7,9 @@ return [
     | Default Database Connection Name
     |--------------------------------------------------------------------------
     |
-    | Here you may specify which of the database connections below you wish
-    | to use as your default connection for all database work. Of course
-    | you may use many connections at once using the Database library.
+    | Use "mysql" so that Winter CMS, GymsController, and all models use MySQL.
+    | PostgreSQL is used only for the gymsdata list page via the "gymsdata"
+    | connection (see GymsdataController), never as the default.
     |
     */
 
@@ -83,7 +83,36 @@ return [
             'url' => env('DATABASE_URL'),
             'username' => env('DB_USERNAME', 'winter'),
         ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Gymsdata — PostgreSQL (used ONLY by GymsdataController)
+        |--------------------------------------------------------------------------
+        | Do not set as default. Rest of app uses MySQL. Configure via
+        | GYMSDATA_DATABASE_URL or GYMSDATA_DB_* in .env.
+        */
+        'gymsdata' => [
+            'charset' => 'utf8',
+            'database' => env('GYMSDATA_DB_DATABASE', env('DB_DATABASE', 'gymdues')),
+            'driver' => 'pgsql',
+            'host' => env('GYMSDATA_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'password' => env('GYMSDATA_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'port' => env('GYMSDATA_DB_PORT', env('DB_PORT', '5432')),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('GYMSDATA_DB_SSLMODE', 'prefer'),
+            'url' => env('GYMSDATA_DATABASE_URL'),
+            'username' => env('GYMSDATA_DB_USERNAME', env('DB_USERNAME', 'winter')),
+        ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Gymsdata table name (when using gymsdata connection)
+    |--------------------------------------------------------------------------
+    */
+    'gymsdata_table' => env('GYMSDATA_DB_TABLE', 'gyms_data'),
 
     /*
     |--------------------------------------------------------------------------
