@@ -35,6 +35,7 @@ Route::prefix('api/v1')
     });
 
     Route::get('best-gyms-sitemaps', [GymsController::class, 'bestGymsSitemap']);
+    Route::get('popular-gyms-state-city', [GymsController::class, 'popularGymsStateCity']);
     Route::get('gyms', [GymsController::class, 'index']);
     Route::post('gyms', [GymsController::class, 'store']);
     Route::get('gyms/addresses-by-location', [GymsController::class, 'addressesByLocation']);
@@ -45,7 +46,7 @@ Route::prefix('api/v1')
     Route::get('gyms/cities-and-states', [GymsController::class, 'citiesAndStates']);
     Route::get('gyms/cities', [GymsController::class, 'cities']);
     Route::get('gyms/highly-rated', [GymsController::class, 'highlyRated']);
-    Route::get('gyms/filter-state/{state}',[GymsController::class,'filteredStateGyms']);
+    Route::get('gyms/filter-state',[GymsController::class,'filteredStateGyms']);
     Route::get('gyms/filtered-top-gyms', [GymsController::class, 'filteredTopGyms']);
     Route::get('gyms/next-favourite-gyms', [GymsController::class, 'nextFavouriteGyms']);
     Route::get('gyms/{slug}/nearby', [GymsController::class, 'nearby']);

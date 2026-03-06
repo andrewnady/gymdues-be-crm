@@ -1444,28 +1444,24 @@ class GymsController extends Controller {
   }
 
   /**
-   * GET /api/v1/gyms/filter-state/{state}
-   * Gyms filter by state for the homepage.
+   * GET /api/v1/gyms/filter-state
+   * Gyms filter by slug for the homepage.
    * Supports pagination via ?page= and ?per_page= query params.
    */
-  public function filteredStateGyms($state, Request $request) {
+  public function filteredStateGyms(Request $request) {
     try {
+        $slug = $request->input('slug');
+        
+        $page = BestGymsPage::where('slug', $slug)
+          ->first();
 
-        $topGyms = BestGymsPage::query()
-          ->where('state', $state)
-          ->get()
-          ->pluck('gyms_data')
-          ->flatten(1) 
-          ->sortByDesc('rating') 
-          ->values()
-          ->take(20);
+        if (!$page || empty($page->gyms_data)) {
+          return response()->json(['data' => [], 'page' => null]);
+        }
 
-        $paginator = new LengthAwarePaginator($topGyms, $topGyms->count(), $topGyms->count(), 1);
-
-        $result = $paginator->toArray();
-        unset($result['links']);
-  
-        return response()->json($result);
+        return response()->json([
+          'data' => $page->gyms_data,
+        ]);
     } catch (\Exception $e) {
       Log::error('Error in GymsController@filteredStateGyms: ' . $e->getMessage(), [
         'trace' => $e->getTraceAsString(),
@@ -1551,6 +1547,67 @@ class GymsController extends Controller {
       return response()->json([
         'error' => 'Internal server error',
         'message' => $e->getMessage()
+      ], 500);
+    }
+  }
+
+  public function popularGymsStateCity()
+  {
+    $locations = [
+      ['city' => null,            'state' => 'New York'],
+      ['city' => 'Los Angeles',   'state' => 'California'],
+      ['city' => 'Chicago',       'state' => 'Illinois'],
+      ['city' => 'Houston',       'state' => 'Texas'],
+      ['city' => 'Phoenix',       'state' => 'Arizona'],
+      ['city' => 'Philadelphia',  'state' => 'Pennsylvania'],
+      ['city' => 'San Antonio',   'state' => 'Texas'],
+      ['city' => 'San Diego',     'state' => 'California'],
+      ['city' => 'Dallas',        'state' => 'Texas'],
+      ['city' => 'San Jose',      'state' => 'California'],
+      ['city' => 'Austin',        'state' => 'Texas'],
+      ['city' => 'San Francisco', 'state' => 'California'],
+      ['city' => 'Miami',         'state' => 'Florida'],
+      ['city' => 'Las Vegas',     'state' => 'Nevada'],
+      ['city' => 'Seattle',       'state' => 'Washington'],
+      ['city' => 'Denver',        'state' => 'Colorado'],
+      ['city' => 'Washington',    'state' => 'District of Columbia'],
+      ['city' => 'Boston',        'state' => 'Massachusetts'],
+      ['city' => 'Atlanta',       'state' => 'Georgia'],
+      ['city' => 'Orlando',       'state' => 'Florida'],
+    ];
+
+    try {
+      $results = [];
+
+      foreach ($locations as $location) {
+        $query = BestGymsPage::select(['title', 'slug', 'featured_image', 'state', 'city'])
+          ->where('state', $location['state']);
+
+        if ($location['city'] === null) {
+          $query->whereNull('city');
+        } else {
+          $query->where('city', $location['city']);
+        }
+
+        $page = $query->first();
+
+        if ($page) {
+          $results[] = [
+            'title'          => $page->title,
+            'slug'           => $page->slug,
+            'featured_image' => $page->featured_image,
+          ];
+        }
+      }
+
+      return response()->json(['data' => $results]);
+    } catch (\Exception $e) {
+      Log::error('Error in GymsController@popularGymsStateCity: ' . $e->getMessage(), [
+        'trace' => $e->getTraceAsString(),
+      ]);
+      return response()->json([
+        'error'   => 'Internal server error',
+        'message' => $e->getMessage(),
       ], 500);
     }
   }
