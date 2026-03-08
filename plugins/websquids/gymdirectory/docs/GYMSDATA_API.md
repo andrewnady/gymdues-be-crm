@@ -62,7 +62,7 @@ All endpoints require the same API key / middleware as the rest of `/api/v1`.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `gymsdata/list-page` | US list page: total gyms, states, contact stats, sample rows |
+| GET | `gymsdata/list-page` | US list page: total gyms, states, types, contact stats, sample rows; includes price + count per state/type and full-dataset price |
 | GET | `gymsdata/state-comparison` | All states’ metrics (frontend compares any subset) |
 | GET | `gymsdata/state-page/{state}` | Single state: stats, top cities (state = lowercase, hyphens e.g. `california`) |
 | GET | `gymsdata/city-page/{state}/{city}` | Single city: stats, top areas, nearby (state/city = lowercase, hyphens e.g. `california`/`costa-mesa`) |
@@ -75,6 +75,10 @@ All endpoints require the same API key / middleware as the rest of `/api/v1`.
 | GET | `gymsdata/cities-and-states` | States + cities with counts (one-shot) |
 | GET | `gymsdata/cities` | Cities in a state (with optional filters) |
 | GET | `gymsdata` | Paginated gym list (index) |
+| POST | `gymsdata/sample-download` | Submit name + email; optional **state**, **city** (with state), **type**, or none (full); returns Excel + email copy |
+| POST | `gymsdata/checkout` | Create Stripe Checkout; **amount calculated from scope** (row count, same as list/state/city price). Body: name, email; optional state, city, type. Returns session URL. |
+| POST | `gymsdata/resend-purchase-email` | Resend data email for a paid purchase (by id; optional token) |
+| POST | `webhooks/stripe/gymsdata-purchase` | Stripe webhook (no API key) for `checkout.session.completed` |
 
 **Response summary**
 
@@ -89,9 +93,9 @@ All endpoints require the same API key / middleware as the rest of `/api/v1`.
 | `testimonials` | Object `{ testimonials: [...] }` |
 | `industry-trends` | Object `{ newGymsByMonth, mostGrowingCities, categories, franchiseVsIndependent }` |
 | `state-comparison` | Object `{ states: [{ state, stateName, stateSlug, totalGyms, withEmail, withPhone, avgRating, densityPer100k, imageUrl }] }` |
-| `state-page` | Object `{ state, stateName, stateSlug, totalGyms, citiesCount, pctWithEmail, pctWithPhone, pctWithSocial, avgRating, topCities, imageUrl, cities?, nearbyCities? }` |
-| `city-page` | Object `{ state, stateName, stateSlug, city, totalGyms, pctWithEmail, pctWithPhone, pctWithSocial, avgRating, topAreas, nearbyCities, imageUrl }` |
-| `list-page` | Object `{ totalGyms, statesCovered, states, withEmail, withPhone, withPhoneAndEmail, withWebsite, withFacebook, withInstagram, withTwitter, withLinkedin, withYoutube, ratedCount, sample }` |
+| `state-page` | Object `{ state, stateName, stateSlug, totalGyms, price, formattedPrice, citiesCount, ... topCities, cities?, nearbyCities? }` — state and each city have **price**, **formattedPrice** (row-count based) |
+| `city-page` | Object `{ state, stateName, stateSlug, city, totalGyms, price, formattedPrice, ... topAreas, nearbyCities }` — city and each nearby city have **price**, **formattedPrice** |
+| `list-page` | Object `{ totalGyms, price, formattedPrice, statesCovered, states, typesCovered, types, ... sample }` — each **state** and **type** has `count`, `price`, `formattedPrice`; full-dataset `price`/`formattedPrice` at root |
 | `gymsdata` (index) | Paginated `{ data, current_page, per_page, total, from, to, first_page_url, last_page_url, next_page_url, prev_page_url, path }` |
 
 ---
@@ -358,11 +362,17 @@ Optional table columns used when present: `created_at`, `category`, `ownership_t
 
 **Endpoint:** `GET /api/v1/gymsdata/state-comparison`
 
-Returns metrics for **all states** in one response so the frontend can compare any subset (e.g. pick 3) without extra requests. One aggregated DB query. Metrics: totalGyms, withEmail, withPhone, avgRating, densityPer100k.
+Returns metrics for states so the frontend can compare any subset (e.g. pick 3). Optimized for speed: **all states** are cached (default 1 hour); **?states=CA,TX,FL** returns only those states with a single `WHERE state IN (...)` query (no cache, fast with index on `state`). If the request takes too long, the backend returns **504 Gateway Timeout** with a “Took too long” message.
 
-**Request:** No query parameters. Optional: `states` is ignored; backend returns all states.
+**Request:**
 
-**Response:** `200` — object with one entry per state:
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `states`  | string | No       | Comma-separated state codes (e.g. `CA,TX,FL`). When provided, only those states are returned (faster). Omit for all states (cached). |
+
+**Env (optional):** `GYMSDATA_STATE_COMPARISON_TIMEOUT_MS` (default 12000), `GYMSDATA_STATE_COMPARISON_CACHE_TTL` (seconds, default 3600). Ensure index on `state` exists for the gymsdata table (migration 1.0.47 or `CREATE INDEX idx_gyms_data_state ON gyms_data (state)`).
+
+**Response:** `200` — object with one entry per state (or per requested state). `504` if the query times out.
 
 ```json
 {
@@ -382,7 +392,7 @@ Returns metrics for **all states** in one response so the frontend can compare a
 }
 ```
 
-Frontend: filter `states` by selected codes (e.g. CA, TX, FL) to render the comparison.
+Frontend can either request **?states=CA,TX,FL** for a faster response or request all states and filter client-side.
 
 ---
 
@@ -403,7 +413,7 @@ Data for “List of Gyms in [State]” page: stats, top cities, optional full ci
 | `cities_sort`  | string | No       | `count` (default) or `name`. |
 | `cities_limit` | int    | No       | Max cities when `include_cities=1` (1–500, default 200). |
 
-**Response:** `200` — object:
+**Response:** `200` — object includes **price**, **formattedPrice** for the state (row-count based); **topCities** and **cities** items include `count`, **price**, **formattedPrice**:
 
 ```json
 {
@@ -411,13 +421,15 @@ Data for “List of Gyms in [State]” page: stats, top cities, optional full ci
   "stateName": "California",
   "stateSlug": "california",
   "totalGyms": 12500,
+  "price": 99,
+  "formattedPrice": "$99",
   "citiesCount": 450,
   "pctWithEmail": 73,
   "pctWithPhone": 72,
   "pctWithSocial": 50,
   "avgRating": 4.3,
   "topCities": [
-    { "city": "Los Angeles", "count": 1200, "label": "Los Angeles, California" }
+    { "city": "Los Angeles", "count": 1200, "price": 99, "formattedPrice": "$99", "label": "Los Angeles, California" }
   ],
   "imageUrl": "https://example.com/images/california.jpg",
   "cities": [],
@@ -425,7 +437,7 @@ Data for “List of Gyms in [State]” page: stats, top cities, optional full ci
 }
 ```
 
-`cities` and `nearbyCities` are only present when `include_cities=1`. Each city item: `label`, `city`, `state`, `stateName`, `postal_code` (empty when grouped by city), `count`.
+`cities` and `nearbyCities` are only present when `include_cities=1`. Each city item: `label`, `city`, `state`, `stateName`, `postal_code` (empty when grouped by city), `count`, **price**, **formattedPrice**.
 
 ---
 
@@ -444,7 +456,7 @@ Data for “List of Gyms in [City], [State]” page: stats, top areas by postal 
 | `state`   | string | Yes      | Path: lowercase slug (e.g. `california`). Query: same or state code/name. |
 | `city`    | string | Yes      | Path: lowercase slug with hyphens (e.g. `costa-mesa`). Query: same or city name. |
 
-**Response:** `200` — object:
+**Response:** `200` — object includes **price**, **formattedPrice** for the city; **nearbyCities** items include `count`, **price**, **formattedPrice**:
 
 ```json
 {
@@ -453,6 +465,8 @@ Data for “List of Gyms in [City], [State]” page: stats, top areas by postal 
   "stateSlug": "california",
   "city": "Costa Mesa",
   "totalGyms": 31,
+  "price": 29,
+  "formattedPrice": "$29",
   "pctWithEmail": 73,
   "pctWithPhone": 72,
   "pctWithSocial": 50,
@@ -463,7 +477,7 @@ Data for “List of Gyms in [City], [State]” page: stats, top areas by postal 
     { "area": "", "count": 8, "label": "Other" }
   ],
   "nearbyCities": [
-    { "city": "Irvine", "count": 28, "label": "Irvine, California" }
+    { "city": "Irvine", "count": 28, "price": 29, "formattedPrice": "$29", "label": "Irvine, California" }
   ],
   "imageUrl": "https://example.com/images/california.jpg"
 }
@@ -475,7 +489,7 @@ Data for “List of Gyms in [City], [State]” page: stats, top areas by postal 
 
 **Endpoint:** `GET /api/v1/gymsdata/list-page`
 
-One-shot data for “List of Gyms in United States”: summary stats, states with counts, sample rows.
+One-shot data for “List of Gyms in United States”: summary stats, **states** and **types** with counts (same shape), sample rows.
 
 **Request:**
 
@@ -483,11 +497,13 @@ One-shot data for “List of Gyms in United States”: summary stats, states wit
 |--------------|------|----------|-------------|
 | `sample_size`| int  | No       | Number of sample rows (1–20, default 5). |
 
-**Response:** `200` — object:
+**Response:** `200` — object with root `totalGyms`, `price`, `formattedPrice` (full-dataset); `states` and `types` each include `count`, `pct`, **price**, **formattedPrice** (row-count based). Use for "Buy data" and **POST gymsdata/checkout** `amount`.
 
 ```json
 {
   "totalGyms": 67500,
+  "price": 249,
+  "formattedPrice": "$249",
   "statesCovered": 51,
   "states": [
     {
@@ -496,7 +512,20 @@ One-shot data for “List of Gyms in United States”: summary stats, states wit
       "stateSlug": "california",
       "count": 12500,
       "pct": 18.5,
+      "price": 99,
+      "formattedPrice": "$99",
       "imageUrl": "https://example.com/images/california.jpg"
+    }
+  ],
+  "typesCovered": 3,
+  "types": [
+    {
+      "type": "Gym",
+      "typeSlug": "gym",
+      "count": 60000,
+      "pct": 88.9,
+      "price": 249,
+      "formattedPrice": "$249"
     }
   ],
   "withEmail": 49275,
@@ -632,3 +661,55 @@ CREATE INDEX idx_gyms_data_city_state ON gyms_data (city, state);
 ```
 
 If `id` should auto-increment (e.g. for new inserts), use `id BIGSERIAL PRIMARY KEY` instead of `id BIGINT PRIMARY KEY`. Then load your JSON/CSV into `gyms_data` (e.g. via import script or DB tool).
+
+### Downloads table (same PostgreSQL database)
+
+Generic table for **sample download** (free) and **purchase** (buy all data). Create in the **same database** as your gyms table. Table name: `downloads`.
+
+| Column      | Type           | Description |
+|-------------|----------------|-------------|
+| id          | BIGSERIAL      | Primary key |
+| name        | VARCHAR(255)   | Contact name |
+| email       | VARCHAR(255)   | Contact email |
+| type        | VARCHAR(50)    | `sample` (default) or `purchase` |
+| amount      | DECIMAL(10,2)  | Optional; for purchases |
+| stripe_checkout_session_id | VARCHAR(255) | Stripe Checkout session id (for webhook lookup) |
+| payment_status | VARCHAR(50) | `pending` (default), `paid`, `failed`, `refunded` |
+| email_sent_at | TIMESTAMP   | When data was sent to customer; **NULL = not sent** (allows resend if failed) |
+| data_state    | VARCHAR(10) | State code when from state or city page (e.g. CA) |
+| data_city     | VARCHAR(100)| City slug/name when from city page (state required) |
+| data_type     | VARCHAR(50) | Business type when from type page (e.g. Gym) |
+| created_at  | TIMESTAMP      | |
+| updated_at  | TIMESTAMP      | |
+
+**Sample download and checkout** — front can send:
+- **State + city** (city page): `state` and `city` (e.g. `CA`, `costa-mesa`)
+- **State only** (state page): `state`
+- **Type only** (type page): `type`
+- **Neither** (home): full data. If `city` is sent, `state` is required.
+
+```sql
+CREATE TABLE downloads (
+  id BIGSERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL DEFAULT 'sample',
+  amount DECIMAL(10,2) NULL,
+  stripe_checkout_session_id VARCHAR(255) NULL,
+  payment_status VARCHAR(50) NOT NULL DEFAULT 'pending',
+  email_sent_at TIMESTAMP NULL,
+  data_state VARCHAR(10) NULL,
+  data_city VARCHAR(100) NULL,
+  data_type VARCHAR(50) NULL,
+  created_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NULL
+);
+```
+
+Or run the plugin migration: `php artisan winter:up`.
+
+**Stripe checkout and callback**
+
+- **Checkout:** Send **name**, **email** and optional **state**, **city** (with state), **type**, or none. **Amount is calculated from row count** for that scope (same tiered pricing as list-page / state-page / city-page). Backend stores `data_state` / `data_city` / `data_type` and creates a Stripe Checkout Session. Response returns the session URL for redirect. **Return URLs:** `success_url` = `{GYMSDATA_FRONTEND_URL}/gymsdata/checkout/success?session_id={CHECKOUT_SESSION_ID}`, `cancel_url` = `{GYMSDATA_FRONTEND_URL}/gymsdata/checkout/cancel`. Set `GYMSDATA_FRONTEND_URL` (e.g. `https://gymdues.com`) in env; falls back to `APP_URL` if unset.
+- **Callback:** On `checkout.session.completed`, backend finds the row, sets `payment_status = 'paid'`, then emails an **Excel file** filtered by state+city, state only, type only, or full data, and sets `email_sent_at`. If sending fails, leave `email_sent_at` NULL so you can resend.
+- **Resend:** Use `POST /api/v1/gymsdata/resend-purchase-email` with the record `id` (and optional secret) to retry sending for rows where `payment_status = 'paid'` and `email_sent_at` is NULL (or force resend). On success, set `email_sent_at`.
