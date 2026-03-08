@@ -43,7 +43,10 @@
         "laravel/framework": "^9.1",
         "tymon/jwt-auth": "^2.2",
         "winter/wn-blog-plugin": "^2.2",
-        "guzzlehttp/guzzle": "^7.5"
+        "guzzlehttp/guzzle": "^7.5",
+        "stevebauman/location": "^7.6",
+        "stripe/stripe-php": "^10.0",
+        "phpoffice/phpspreadsheet": "^1.29"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.5.8",
