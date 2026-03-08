@@ -1637,12 +1637,29 @@ class GymsdataController extends Controller
             $frontendOrigin = rtrim(env('GYMSDATA_FRONTEND_URL', env('APP_URL', '')), '/');
             $successUrl = $frontendOrigin . '/gymsdata/checkout/success?session_id={CHECKOUT_SESSION_ID}';
             $cancelUrl = $frontendOrigin . '/gymsdata/checkout/cancel';
+            if ($city && $state) {
+                $productName = 'Gyms data: ' . $city . ', ' . $state;
+                $productDescription = 'Gym list for ' . $city . ', ' . $state;
+            } elseif ($state) {
+                $productName = 'Gyms data: ' . $state;
+                $productDescription = 'Gym list for ' . $state;
+            } elseif ($type) {
+                $productName = 'Gyms data: ' . $type;
+                $productDescription = 'Gym list for type: ' . $type;
+            } else {
+                $productName = 'Full gyms data download';
+                $productDescription = 'Complete gym list data';
+            }
+            if ($type && ($state || $city)) {
+                $productName .= ' (' . $type . ')';
+                $productDescription .= ' — type: ' . $type;
+            }
             $session = \Stripe\Checkout\Session::create([
                 'payment_method_types' => ['card'],
                 'line_items' => [[
                     'price_data' => [
                         'currency' => strtolower(env('GYMSDATA_STRIPE_CURRENCY', 'usd')),
-                        'product_data' => ['name' => 'Full gyms data download', 'description' => 'Complete gym list data'],
+                        'product_data' => ['name' => $productName, 'description' => $productDescription],
                         'unit_amount' => $amountCents,
                     ],
                     'quantity' => 1,
