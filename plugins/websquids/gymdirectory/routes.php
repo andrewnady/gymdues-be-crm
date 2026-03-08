@@ -11,12 +11,18 @@ use Websquids\Gymdirectory\Controllers\Api\NewsletterSubscriptionsController;
 use Websquids\Gymdirectory\Controllers\Api\BlogController;
 use Websquids\Gymdirectory\Controllers\Api\CommentsController;
 
+// Stripe webhook (no API key – Stripe calls this with signature)
+Route::post('api/v1/webhooks/stripe/gymsdata-purchase', [GymsdataController::class, 'stripeWebhook']);
+
 Route::prefix('api/v1')
   ->middleware([ApiKeyMiddleware::class])
   ->group(function () {
 
     // Gymsdata (second database) – list page / gymsdata.gymdues.com
     Route::prefix('gymsdata')->group(function () {
+      Route::post('sample-download', [GymsdataController::class, 'sampleDownload']);
+      Route::post('checkout', [GymsdataController::class, 'createCheckout']);
+      Route::post('resend-purchase-email', [GymsdataController::class, 'resendPurchaseEmail']);
       Route::get('list-page', [GymsdataController::class, 'listPage']);
       Route::get('state-comparison', [GymsdataController::class, 'stateComparison']);
       Route::get('state-page/{state}', [GymsdataController::class, 'statePage'])->where('state', '[a-z0-9\-]+');
