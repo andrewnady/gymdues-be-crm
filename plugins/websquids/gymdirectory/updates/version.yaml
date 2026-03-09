@@ -116,3 +116,21 @@
 1.0.40:
     - 'Updated table websquids_gymdirectory_best_gyms_pages - remove country_id, state_id, city_id; add country column after gyms_data'
     - update_best_gyms_pages_replace_ids_with_country.php
+1.0.41:
+    - 'Create downloads table in PostgreSQL gymsdata DB (for sample download & purchase leads)'
+    - create_gymsdata_sample_downloads_table.php
+1.0.42:
+    - 'Add type and amount columns to downloads (sample vs purchase)'
+    - update_gymsdata_sample_downloads_add_type_and_amount.php
+1.0.43:
+    - 'Add Stripe checkout + payment_status + email_sent_at to downloads'
+    - update_gymsdata_sample_downloads_stripe_and_email_sent.php
+1.0.44:
+    - 'Rename sample_downloads to downloads (existing installs)'
+    - rename_gymsdata_sample_downloads_to_downloads.php
+1.0.45:
+    - 'Add data_state, data_type to downloads (state or type page context; full when both null)'
+    - update_gymsdata_downloads_add_data_scope_columns.php
+1.0.46:
+    - 'Add data_city to downloads (city page: state + city)'
+    - update_gymsdata_downloads_add_data_city.php

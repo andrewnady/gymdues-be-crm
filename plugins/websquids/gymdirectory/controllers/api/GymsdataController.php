@@ -49,7 +49,7 @@ class GymsdataController extends Controller
         return $query;
     }
 
-    /** All DB columns included in Excel export (order = header + column order). */
+    /** All DB columns included in Excel export (order = header + column order). Matches gyms table schema (text, int4, numeric, jsonb). */
     protected function getGymsExportColumns(): array
     {
         return [
@@ -60,6 +60,37 @@ class GymsdataController extends Controller
             'latitude', 'longitude', 'total_reviews', 'average_rating', 'reviews_per_score',
             'reviews_per_score_1', 'reviews_per_score_2', 'reviews_per_score_3', 'reviews_per_score_4', 'reviews_per_score_5',
         ];
+    }
+
+    /** Numeric columns (int4, numeric): complete = non-null only (0 is valid). */
+    protected function getGymsNumericColumns(): array
+    {
+        return [
+            'years_in_business', 'latitude', 'longitude', 'total_reviews', 'average_rating',
+            'reviews_per_score_1', 'reviews_per_score_2', 'reviews_per_score_3', 'reviews_per_score_4', 'reviews_per_score_5',
+        ];
+    }
+
+    /** JSONB column: complete = non-null only. */
+    protected function getGymsJsonbColumns(): array
+    {
+        return ['reviews_per_score'];
+    }
+
+    /**
+     * Restrict query to rows where every export column is non-null; text columns must also be non-empty (complete data for sample).
+     * Matches gyms schema: text (non-empty), int4/numeric (non-null), jsonb (non-null).
+     */
+    protected function applyCompleteDataScope($query): void
+    {
+        $numeric = array_fill_keys($this->getGymsNumericColumns(), true);
+        $jsonb = array_fill_keys($this->getGymsJsonbColumns(), true);
+        foreach ($this->getGymsExportColumns() as $col) {
+            $query->whereNotNull($col);
+            if (!isset($numeric[$col]) && !isset($jsonb[$col])) {
+                $query->where($col, '!=', '');
+            }
+        }
     }
 
     /** Write one row to the sheet at $rowNum for the given $row object using export columns. */
@@ -782,44 +813,103 @@ class GymsdataController extends Controller
     {
         $chains = [
             [
-                'chainName' => 'LA Fitness',
-                'locations' => 700,
-                'locationsLabel' => '700+',
-                'avgPrice' => 35,
-                'avgPriceLabel' => '$35/mo',
-                'amenitiesScore' => 8.5,
-                'amenitiesScoreLabel' => '8.5/10',
-                'userRating' => 4.2,
+                'chainName' => 'Planet Fitness',
+                'locations' => 2800,
+                'locationsLabel' => '2,800+',
+                'avgPrice' => 15,
+                'avgPriceLabel' => '$15/mo',
+                'amenitiesScore' => 6.8,
+                'amenitiesScoreLabel' => '6.8/10',
+                'userRating' => 3.9,
+                'path' => 'planet-fitness'
+            ],
+            [
+                'chainName' => 'Anytime Fitness',
+                'locations' => 5500,
+                'locationsLabel' => '5,500+',
+                'avgPrice' => 55,
+                'avgPriceLabel' => '$55/mo',
+                'amenitiesScore' => 7.2,
+                'amenitiesScoreLabel' => '7.2/10',
+                'userRating' => 4.1,
+                'path' => 'anytime-fitness'
+            ],
+            [
+                'chainName' => 'Gold’s Gym',
+                'locations' => 600,
+                'locationsLabel' => '600+',
+                'avgPrice' => 50,
+                'avgPriceLabel' => '$50/mo',
+                'amenitiesScore' => 8.8,
+                'amenitiesScoreLabel' => '8.8/10',
+                'userRating' => 4.3,
+                'path' => 'golds-gym-2'
+            ],
+            [
+                'chainName' => 'Crunch Fitness',
+                'locations' => 450,
+                'locationsLabel' => '450+',
+                'avgPrice' => 15,
+                'avgPriceLabel' => '$15/mo',
+                'amenitiesScore' => 8.2,
+                'amenitiesScoreLabel' => '8.2/10',
+                'userRating' => 4.0,
+                'path' => 'crunch-fitness-southpark-meadows'
+            ],
+            [
+                'chainName' => 'Snap Fitness',
+                'locations' => 1000,
+                'locationsLabel' => '1,000+',
+                'avgPrice' => 45,
+                'avgPriceLabel' => '$45/mo',
+                'amenitiesScore' => 6.5,
+                'amenitiesScoreLabel' => '6.5/10',
+                'userRating' => 3.7,
+                'path' => 'snap-fitness'
+            ],
+            [
+                'chainName' => 'F45 Training',
+                'locations' => 2000,
+                'locationsLabel' => '2,000+',
+                'avgPrice' => 175,
+                'avgPriceLabel' => '$175/mo',
+                'amenitiesScore' => 7.0,
+                'amenitiesScoreLabel' => '7.0/10',
+                'userRating' => 4.6,
+                'path' => 'f45-training-capitol-hill'
             ],
             [
                 'chainName' => '24 Hour Fitness',
                 'locations' => 450,
                 'locationsLabel' => '450+',
-                'avgPrice' => 40,
-                'avgPriceLabel' => '$40/mo',
+                'avgPrice' => 35,
+                'avgPriceLabel' => '$35/mo',
                 'amenitiesScore' => 8.0,
                 'amenitiesScoreLabel' => '8.0/10',
                 'userRating' => 4.0,
+                'path' => '24-hour-fitness-2'
             ],
             [
-                'chainName' => 'Planet Fitness',
-                'locations' => 2400,
-                'locationsLabel' => '2,400+',
-                'avgPrice' => 10,
-                'avgPriceLabel' => '$10/mo',
-                'amenitiesScore' => 6.5,
-                'amenitiesScoreLabel' => '6.5/10',
-                'userRating' => 3.8,
+                'chainName' => 'Retro Fitness',
+                'locations' => 120,
+                'locationsLabel' => '120+',
+                'avgPrice' => 25,
+                'avgPriceLabel' => '$25/mo',
+                'amenitiesScore' => 8.4,
+                'amenitiesScoreLabel' => '8.4/10',
+                'userRating' => 4.2,
+                'path' => 'retro-fitness'
             ],
             [
-                'chainName' => 'Equinox',
-                'locations' => 100,
-                'locationsLabel' => '100+',
-                'avgPrice' => 200,
-                'avgPriceLabel' => '$200/mo',
-                'amenitiesScore' => 9.8,
-                'amenitiesScoreLabel' => '9.8/10',
+                'chainName' => 'Orangetheory Fitness',
+                'locations' => 1500,
+                'locationsLabel' => '1,500+',
+                'avgPrice' => 160,
+                'avgPriceLabel' => '$160/mo',
+                'amenitiesScore' => 7.8,
+                'amenitiesScoreLabel' => '7.8/10',
                 'userRating' => 4.5,
+                'path' => 'orangetheory-fitness'
             ],
         ];
 
@@ -1359,20 +1449,14 @@ class GymsdataController extends Controller
                 ];
             });
 
-            // Sample rows for the preview table (e.g. 5 rows)
+            // Sample rows for the preview table (complete data: all export columns non-empty)
             $sampleSize = max(1, min(20, (int) $request->input('sample_size', 10)));
             $sampleRows = (clone $t)
-                ->select(['id', 'business_name','type', 'full_address', 'city', 'state', 'email_1', 'business_phone', 'business_website'])
-                ->whereNotNull('business_name')->where('business_name', '!=', '')
-                ->whereNotNull('full_address')->where('full_address', '!=', '')
-                ->whereNotNull('city')->where('city', '!=', '')
-                ->whereNotNull('state')->where('state', '!=', '')
-                ->whereNotNull('email_1')->where('email_1', '!=', '')
-                ->whereNotNull('business_phone')->where('business_phone', '!=', '')
-                ->whereNotNull('business_website')->where('business_website', '!=', '')
+                ->select(['id', 'business_name', 'type', 'full_address', 'city', 'state', 'email_1', 'business_phone', 'business_website'])
                 ->orderBy('id')
-                ->limit($sampleSize)
-                ->get();
+                ->limit($sampleSize);
+            $this->applyCompleteDataScope($sampleRows);
+            $sampleRows = $sampleRows->get();
             $sample = $sampleRows->map(function ($row) {
                 return [
                     'name' => $row->business_name ?? '',
@@ -1558,13 +1642,9 @@ class GymsdataController extends Controller
             $conn->table('downloads')->insert($sampleInsert);
             $sampleSize = max(1, min(5, (int) $request->input('sample_size', 5)));
             $query = $this->table()
-                ->whereNotNull('business_name')->where('business_name', '!=', '')
-                ->whereNotNull('full_address')->where('full_address', '!=', '')
-                ->whereNotNull('email_1')->where('email_1', '!=', '')
-                ->whereNotNull('business_phone')->where('business_phone', '!=', '')
-                ->whereNotNull('business_website')->where('business_website', '!=', '')
                 ->orderBy('id')
                 ->limit($sampleSize);
+            $this->applyCompleteDataScope($query);
             $this->applyDataScope($query, $request->input('state'), $request->input('city'), $request->input('type'));
             $sampleRows = $query->get();
             $path = $this->buildGymsExcelPath($sampleRows);
