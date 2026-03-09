@@ -1750,6 +1750,7 @@ class GymsdataController extends Controller
                 'client_reference_id' => (string) $id,
                 'customer_email' => $request->input('email'),
                 'metadata' => ['download_id' => (string) $id],
+                'payment_intent_data' => ['metadata' => ['download_id' => (string) $id]],
             ]);
             $conn->table('downloads')->where('id', $id)->update([
                 'stripe_checkout_session_id' => $session->id,
@@ -1768,7 +1769,8 @@ class GymsdataController extends Controller
 
     /**
      * POST /api/v1/webhooks/stripe/gymsdata-purchase
-     * Stripe webhook (no API key). On checkout.session.completed: set payment_status=paid, send data email, set email_sent_at.
+     * Stripe webhook. On charge.succeeded: set payment_status=paid, send data email, set email_sent_at.
+     * Uses PaymentIntent metadata (download_id) set at checkout; configure Stripe to send charge.succeeded to this URL.
      */
     public function stripeWebhook(Request $request)
     {
@@ -1777,46 +1779,43 @@ class GymsdataController extends Controller
             Log::warning('GymsdataController@stripeWebhook: STRIPE_WEBHOOK_SECRET_GYMSDATA not set');
             return response()->json(['error' => 'Webhook not configured'], 503);
         }
-        Log::info('GymsdataController@stripeWebhook: secret set');
         $payload = $request->getContent();
-        Log::info('GymsdataController@stripeWebhook: payload set');
-        Log::info($payload);
         $sig = $request->header('Stripe-Signature');
-        Log::info('GymsdataController@stripeWebhook: sig set');
-        Log::info($sig);
         try {
             $event = Webhook::constructEvent($payload, $sig, $secret);
-            Log::info('GymsdataController@stripeWebhook: event set');
-            Log::info($event);
         } catch (SignatureVerificationException $e) {
             Log::warning('GymsdataController@stripeWebhook: signature verification failed');
             return response()->json(['error' => 'Invalid signature'], 400);
         } catch (\Exception $e) {
-            Log::error('GymsdataController@stripeWebhook1: ' . $e->getMessage());
+            Log::error('GymsdataController@stripeWebhook: ' . $e->getMessage());
             return response()->json(['error' => 'Webhook error'], 400);
         }
-        Log::info('GymsdataController@stripeWebhook: event type set');
-        Log::info($event->type);
-        if ($event->type !== 'checkout.session.completed') {
-            Log::info('GymsdataController@stripeWebhook: event type not completed');
+        if ($event->type !== 'charge.succeeded') {
             return response()->json(['received' => true]);
         }
-        $session = $event->data->object;
-        $sessionId = $session->id ?? null;
-        if (! $sessionId) {
-            Log::info('GymsdataController@stripeWebhook: session id not set');
+        $charge = $event->data->object;
+        $paymentIntentId = $charge->payment_intent ?? null;
+        if (! $paymentIntentId) {
             return response()->json(['received' => true]);
         }
-        Log::info('GymsdataController@stripeWebhook: session id set');
-        Log::info($sessionId);
         try {
+            $key = env('STRIPE_SECRET');
+            if (! $key) {
+                return response()->json(['error' => 'Server configuration error'], 500);
+            }
+            Stripe::setApiKey($key);
+            $pi = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+            $downloadId = $pi->metadata->download_id ?? null;
+            if (! $downloadId || ! is_numeric($downloadId)) {
+                return response()->json(['received' => true]);
+            }
             $conn = DB::connection('gymsdata');
             $row = $conn->table('downloads')
-                ->where('stripe_checkout_session_id', $sessionId)
+                ->where('id', (int) $downloadId)
                 ->where('type', 'purchase')
                 ->first();
             if (! $row) {
-                Log::warning('GymsdataController@stripeWebhook: no row for session ' . $sessionId);
+                Log::warning('GymsdataController@stripeWebhook: no download for id ' . $downloadId);
                 return response()->json(['received' => true]);
             }
             $conn->table('downloads')->where('id', $row->id)->update([
@@ -1826,7 +1825,7 @@ class GymsdataController extends Controller
             $this->sendPurchaseDataToEmail((int) $row->id);
             return response()->json(['received' => true]);
         } catch (\Exception $e) {
-            Log::error('GymsdataController@stripeWebhook2: ' . $e->getMessage());
+            Log::error('GymsdataController@stripeWebhook: ' . $e->getMessage());
             return response()->json(['error' => 'Processing failed'], 500);
         }
     }
