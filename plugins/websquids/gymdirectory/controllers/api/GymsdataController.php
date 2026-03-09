@@ -1785,6 +1785,7 @@ class GymsdataController extends Controller
             Log::warning('GymsdataController@stripeWebhook: signature verification failed');
             return response()->json(['error' => 'Invalid signature'], 400);
         } catch (\Exception $e) {
+            Log::error('GymsdataController@stripeWebhook1: ' . $e->getMessage());
             return response()->json(['error' => 'Webhook error'], 400);
         }
         if ($event->type !== 'checkout.session.completed') {
@@ -1812,7 +1813,7 @@ class GymsdataController extends Controller
             $this->sendPurchaseDataToEmail((int) $row->id);
             return response()->json(['received' => true]);
         } catch (\Exception $e) {
-            Log::error('GymsdataController@stripeWebhook: ' . $e->getMessage());
+            Log::error('GymsdataController@stripeWebhook2: ' . $e->getMessage());
             return response()->json(['error' => 'Processing failed'], 500);
         }
     }
