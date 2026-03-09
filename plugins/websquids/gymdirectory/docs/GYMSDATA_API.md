@@ -273,7 +273,8 @@ Static gym chain comparison (curated reference data).
       "avgPriceLabel": "$35/mo",
       "amenitiesScore": 8.5,
       "amenitiesScoreLabel": "8.5/10",
-      "userRating": 4.2
+      "userRating": 4.2,
+      "path": "la-fitness"
     }
   ]
 }
