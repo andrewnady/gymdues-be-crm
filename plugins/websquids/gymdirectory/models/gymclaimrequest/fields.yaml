@@ -1,0 +1,52 @@
+fields:
+    gym[name]:
+        label: Gym
+        type: text
+        disabled: true
+    full_name:
+        label: Full Name
+        type: text
+        disabled: true
+    job_title:
+        label: Job Title
+        type: text
+        disabled: true
+    business_email:
+        label: Business Email
+        type: text
+        disabled: true
+    phone_number:
+        label: Phone Number
+        type: text
+        disabled: true
+    verification_method:
+        label: Verification Method
+        type: text
+        disabled: true
+    status:
+        label: Status
+        type: dropdown
+        options:
+            pending: Pending
+            code_sent: Code Sent
+            document_uploaded: Document Uploaded
+            approved: Approved
+            rejected: Rejected
+    document_path:
+        label: Document Path
+        type: text
+        disabled: true
+    ip_address:
+        label: IP Address
+        type: text
+        disabled: true
+    verified_at:
+        label: Verified At
+        type: datepicker
+        mode: datetime
+        disabled: true
+    created_at:
+        label: Submitted At
+        type: datepicker
+        mode: datetime
+        disabled: true

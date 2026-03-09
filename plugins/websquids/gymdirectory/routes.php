@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use websquids\Gymdirectory\Classes\ApiKeyMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsController;
+use Websquids\Gymdirectory\Controllers\Api\GymClaimsController;
 use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
@@ -78,4 +79,13 @@ Route::prefix('api/v1')
     
     // Newsletter subscriptions routes
     Route::post('newsletter-subscriptions', [NewsletterSubscriptionsController::class, 'store']);
+
+    // Gym claim routes
+    Route::post('gym-claims/initiate', [GymClaimsController::class, 'initiate']);
+    Route::get('gym-claims/{id}', [GymClaimsController::class, 'status'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/send-email-code', [GymClaimsController::class, 'sendEmailCode'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/verify-email', [GymClaimsController::class, 'verifyEmail'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/send-phone-code', [GymClaimsController::class, 'sendPhoneCode'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/verify-phone', [GymClaimsController::class, 'verifyPhone'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/upload-document', [GymClaimsController::class, 'uploadDocument'])->where('id', '[0-9]+');
   });

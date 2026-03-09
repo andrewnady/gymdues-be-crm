@@ -44,7 +44,37 @@ class Gym extends Model {
             Contact::class,
             'key' => 'gym_id'
         ],
+        'claimRequests' => [
+            GymClaimRequest::class,
+            'key' => 'gym_id'
+        ],
     ];
+
+    /**
+     * Returns the single approved claim for this gym (null if unclaimed).
+     */
+    public function approvedClaim()
+    {
+        return $this->hasOne(GymClaimRequest::class, 'gym_id')
+            ->where('status', GymClaimRequest::STATUS_APPROVED)
+            ->whereNull('deleted_at');
+    }
+
+    /**
+     * is_claimed accessor — true when an approved claim exists.
+     * Uses the already-loaded approvedClaim relation when available (avoids extra query).
+     */
+    public function getIsClaimedAttribute(): bool
+    {
+        if ($this->relationLoaded('approvedClaim')) {
+            return $this->getRelation('approvedClaim') !== null;
+        }
+
+        return $this->claimRequests()
+            ->where('status', GymClaimRequest::STATUS_APPROVED)
+            ->whereNull('deleted_at')
+            ->exists();
+    }
 
     /**
      * @var array Attribute names to encode and decode using JSON.

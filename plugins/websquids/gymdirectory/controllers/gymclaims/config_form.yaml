@@ -1,0 +1,7 @@
+name: Gym Claim
+form: $/websquids/gymdirectory/models/gymclaimrequest/fields.yaml
+modelClass: websquids\Gymdirectory\Models\GymClaimRequest
+defaultRedirect: websquids/gymdirectory/gymclaims
+update:
+    redirect: websquids/gymdirectory/gymclaims
+    redirectClose: websquids/gymdirectory/gymclaims
