@@ -1777,10 +1777,17 @@ class GymsdataController extends Controller
             Log::warning('GymsdataController@stripeWebhook: STRIPE_WEBHOOK_SECRET_GYMSDATA not set');
             return response()->json(['error' => 'Webhook not configured'], 503);
         }
+        Log::info('GymsdataController@stripeWebhook: secret set');
         $payload = $request->getContent();
+        Log::info('GymsdataController@stripeWebhook: payload set');
+        Log::info($payload);
         $sig = $request->header('Stripe-Signature');
+        Log::info('GymsdataController@stripeWebhook: sig set');
+        Log::info($sig);
         try {
             $event = Webhook::constructEvent($payload, $sig, $secret);
+            Log::info('GymsdataController@stripeWebhook: event set');
+            Log::info($event);
         } catch (SignatureVerificationException $e) {
             Log::warning('GymsdataController@stripeWebhook: signature verification failed');
             return response()->json(['error' => 'Invalid signature'], 400);
@@ -1788,14 +1795,20 @@ class GymsdataController extends Controller
             Log::error('GymsdataController@stripeWebhook1: ' . $e->getMessage());
             return response()->json(['error' => 'Webhook error'], 400);
         }
+        Log::info('GymsdataController@stripeWebhook: event type set');
+        Log::info($event->type);
         if ($event->type !== 'checkout.session.completed') {
+            Log::info('GymsdataController@stripeWebhook: event type not completed');
             return response()->json(['received' => true]);
         }
         $session = $event->data->object;
         $sessionId = $session->id ?? null;
         if (! $sessionId) {
+            Log::info('GymsdataController@stripeWebhook: session id not set');
             return response()->json(['received' => true]);
         }
+        Log::info('GymsdataController@stripeWebhook: session id set');
+        Log::info($sessionId);
         try {
             $conn = DB::connection('gymsdata');
             $row = $conn->table('downloads')
