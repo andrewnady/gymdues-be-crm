@@ -5,6 +5,9 @@ use websquids\Gymdirectory\Classes\ApiKeyMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsController;
 use Websquids\Gymdirectory\Controllers\Api\GymClaimsController;
 use Websquids\Gymdirectory\Controllers\Api\GymDisputesController;
+use Websquids\Gymdirectory\Controllers\Api\GymOwnerAuthController;
+use Websquids\Gymdirectory\Controllers\Api\GymOwnerDashboardController;
+use websquids\Gymdirectory\Classes\GymOwnerAuthMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
@@ -98,4 +101,20 @@ Route::prefix('api/v1')
     // Admin-only dispute resolution
     Route::post('gym-disputes/{id}/approve', [GymDisputesController::class, 'approve'])->where('id', '[0-9]+');
     Route::post('gym-disputes/{id}/reject', [GymDisputesController::class, 'reject'])->where('id', '[0-9]+');
+
+    // Gym owner authentication
+    // Public endpoints
+    Route::post('gym-owner/auth/magic-login', [GymOwnerAuthController::class, 'magicLogin']);
+    Route::post('gym-owner/auth/login', [GymOwnerAuthController::class, 'login']);
+    Route::post('gym-owner/auth/forgot-password', [GymOwnerAuthController::class, 'forgotPassword']);
+    Route::post('gym-owner/auth/reset-password', [GymOwnerAuthController::class, 'resetPassword']);
+
+    // Protected endpoints (require a valid session bearer token)
+    Route::middleware(GymOwnerAuthMiddleware::class)->group(function () {
+        Route::post('gym-owner/auth/set-password', [GymOwnerAuthController::class, 'setPassword']);
+        Route::get('gym-owner/auth/me', [GymOwnerAuthController::class, 'me']);
+        Route::post('gym-owner/auth/logout', [GymOwnerAuthController::class, 'logout']);
+
+        Route::get('gym-owner/dashboard', [GymOwnerDashboardController::class, 'index']);
+    });
   });

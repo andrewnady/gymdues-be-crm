@@ -23,6 +23,7 @@ class GymClaimRequest extends Model
 
     protected $fillable = [
         'gym_id',
+        'user_id',
         'full_name',
         'job_title',
         'business_email',

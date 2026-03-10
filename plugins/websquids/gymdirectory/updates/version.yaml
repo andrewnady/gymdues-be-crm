@@ -122,3 +122,9 @@
 1.0.42:
     - 'Create gym_claim_disputes table for the Claim Dispute feature'
     - create_gym_claim_disputes_table.php
+1.0.43:
+    - 'Add user_id to gym_claim_requests to link approved owners to their Winter.User account'
+    - add_user_id_to_gym_claim_requests.php
+1.0.44:
+    - 'Create gym_owner_tokens table for magic login and session bearer tokens'
+    - create_gym_owner_tokens_table.php

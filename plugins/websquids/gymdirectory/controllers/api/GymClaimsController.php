@@ -10,6 +10,7 @@ use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\Contact;
 use websquids\Gymdirectory\Models\GymClaimRequest;
 use websquids\Gymdirectory\Services\SmsService;
+use websquids\Gymdirectory\Classes\GymOwnerService;
 
 /**
  * GymClaimsController
@@ -217,7 +218,10 @@ class GymClaimsController extends Controller
 
         $gym = Gym::findOrFail($claim->gym_id);
         $claim->approve();
-        $this->dispatchApprovalEmail($claim, $gym);
+
+        $magicToken  = (new GymOwnerService())->provisionAndGenerateMagicToken($claim);
+        $dashboardUrl = (new GymOwnerService())->buildMagicLoginUrl($magicToken);
+        $this->dispatchApprovalEmail($claim, $gym, $dashboardUrl);
 
         return response()->json([
             'success' => true,
@@ -308,7 +312,10 @@ class GymClaimsController extends Controller
 
         $gym = Gym::findOrFail($claim->gym_id);
         $claim->approve();
-        $this->dispatchApprovalEmail($claim, $gym);
+
+        $magicToken   = (new GymOwnerService())->provisionAndGenerateMagicToken($claim);
+        $dashboardUrl = (new GymOwnerService())->buildMagicLoginUrl($magicToken);
+        $this->dispatchApprovalEmail($claim, $gym, $dashboardUrl);
 
         return response()->json([
             'success' => true,
@@ -546,13 +553,12 @@ class GymClaimsController extends Controller
         }
     }
 
-    private function dispatchApprovalEmail(GymClaimRequest $claim, Gym $gym): void
+    private function dispatchApprovalEmail(GymClaimRequest $claim, Gym $gym, string $dashboardUrl): void
     {
         try {
-            $fullName     = $claim->full_name;
-            $gymName      = $gym->name;
-            $toEmail      = $claim->business_email;
-            $dashboardUrl = env('APP_URL', 'https://gymdues.com') . '/dashboard';
+            $fullName = $claim->full_name;
+            $gymName  = $gym->name;
+            $toEmail  = $claim->business_email;
 
             Log::info('Email sent on ' . $toEmail);
 

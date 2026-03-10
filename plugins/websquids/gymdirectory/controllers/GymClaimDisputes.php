@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Mail;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\GymClaimRequest;
 use websquids\Gymdirectory\Models\GymClaimDispute;
+use websquids\Gymdirectory\Classes\GymOwnerService;
 
 class GymClaimDisputes extends Controller
 {
@@ -53,7 +54,7 @@ class GymClaimDisputes extends Controller
         }
 
         // 2. Create new approved claim for the disputer
-        GymClaimRequest::create([
+        $newClaim = GymClaimRequest::create([
             'gym_id'              => $gym->id,
             'full_name'           => $dispute->full_name,
             'job_title'           => $dispute->job_title,
@@ -70,7 +71,12 @@ class GymClaimDisputes extends Controller
         $dispute->reviewed_at = now();
         $dispute->save();
 
-        $this->dispatchDisputeApprovedEmail($dispute, $gym);
+        // 4. Provision user account and generate magic login token for the new owner
+        $gymOwnerService = new GymOwnerService();
+        $magicToken      = $gymOwnerService->provisionAndGenerateMagicToken($newClaim);
+        $dashboardUrl    = $gymOwnerService->buildMagicLoginUrl($magicToken);
+
+        $this->dispatchDisputeApprovedEmail($dispute, $gym, $dashboardUrl);
 
         Flash::success('Dispute approved. Original claim revoked and ownership transferred.');
         return redirect()->back();
@@ -130,14 +136,13 @@ class GymClaimDisputes extends Controller
     // Email helpers
     // =========================================================================
 
-    private function dispatchDisputeApprovedEmail(GymClaimDispute $dispute, ?Gym $gym): void
+    private function dispatchDisputeApprovedEmail(GymClaimDispute $dispute, ?Gym $gym, string $dashboardUrl): void
     {
         if (!$gym) return;
         try {
-            $fullName     = $dispute->full_name;
-            $gymName      = $gym->name;
-            $toEmail      = $dispute->business_email;
-            $dashboardUrl = env('APP_URL', 'https://gymdues.com') . '/dashboard';
+            $fullName = $dispute->full_name;
+            $gymName  = $gym->name;
+            $toEmail  = $dispute->business_email;
 
             Mail::send(
                 'websquids.gymdirectory::mail.dispute_approved',

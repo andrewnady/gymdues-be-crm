@@ -676,8 +676,7 @@ class GymsController extends Controller {
       $gym->profile_checklist = $checklist;
 
       // is_verified = gym is claimed AND every checklist item is complete
-      // $gym->is_verified = $gym->is_claimed && !in_array(false, $checklist, true);
-      $gym->is_verified = true;
+      $gym->is_verified = $gym->is_claimed && !in_array(false, $checklist, true);
 
       return response()->json($gym->toArray());
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
