@@ -89,6 +89,12 @@ class Plugin extends PluginBase
                         'url' => \Backend::url('websquids/gymdirectory/gymclaims'),
                         'permissions' => ['websquids.gymdirectory.manage_gyms'],
                     ],
+                    'gymclaimdisputes' => [
+                        'label' => 'Claim Disputes',
+                        'icon' => 'icon-exclamation-circle',
+                        'url' => \Backend::url('websquids/gymdirectory/gymclaimdisputes'),
+                        'permissions' => ['websquids.gymdirectory.manage_gyms'],
+                    ],
                 ],
             ],
         ];

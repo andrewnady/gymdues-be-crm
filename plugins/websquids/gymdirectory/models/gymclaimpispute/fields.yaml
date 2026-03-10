@@ -1,0 +1,90 @@
+fields:
+
+    # ── Claimant info (read-only) ──────────────────────────────────────────
+    full_name:
+        label: Claimant Full Name
+        type: text
+        span: left
+        disabled: true
+
+    job_title:
+        label: Job Title
+        type: text
+        span: right
+        disabled: true
+
+    business_email:
+        label: Business Email
+        type: text
+        span: left
+        disabled: true
+
+    phone_number:
+        label: Phone Number
+        type: text
+        span: right
+        disabled: true
+
+    ip_address:
+        label: IP Address
+        type: text
+        span: left
+        disabled: true
+
+    # ── Gym & existing claim (read-only) ──────────────────────────────────
+    gym[name]:
+        label: Gym
+        type: text
+        span: left
+        disabled: true
+
+    existing_claim[full_name]:
+        label: Current Claim Holder
+        type: text
+        span: right
+        disabled: true
+
+    existing_claim[business_email]:
+        label: Current Claim Email
+        type: text
+        span: left
+        disabled: true
+
+    # ── Document ──────────────────────────────────────────────────────────
+    document_path:
+        label: Uploaded Document Path
+        type: text
+        span: full
+        disabled: true
+        comment: 'Use the Download Document button to view the file.'
+
+    # ── Admin review ──────────────────────────────────────────────────────
+    status:
+        label: Status
+        type: dropdown
+        span: left
+        options:
+            pending: Pending
+            under_review: Under Review
+            approved: Approved
+            rejected: Rejected
+
+    reviewed_at:
+        label: Reviewed At
+        type: datepicker
+        mode: datetime
+        span: right
+
+    admin_notes:
+        label: Admin Notes
+        type: textarea
+        span: full
+        size: small
+        comment: 'Internal notes visible only to admins.'
+
+    created_at:
+        label: Submitted At
+        type: datepicker
+        mode: datetime
+        span: left
+        disabled: true

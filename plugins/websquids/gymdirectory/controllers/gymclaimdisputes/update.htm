@@ -1,0 +1,81 @@
+<?php Block::put('breadcrumb') ?>
+    <ul>
+        <li><a href="<?= Backend::url('websquids/gymdirectory/gymclaimdisputes') ?>">Gym Claim Disputes</a></li>
+        <li><?= e($this->pageTitle) ?></li>
+    </ul>
+<?php Block::endPut() ?>
+
+<?php if (!$this->fatalError): ?>
+
+    <?= Form::open(['class' => 'layout']) ?>
+
+        <div class="layout-row">
+            <?= $this->formRender() ?>
+        </div>
+
+        <div class="form-buttons">
+            <div class="loading-indicator-container">
+
+                <?php
+                    $record = $this->vars['formModel'] ?? null;
+                    $isPending = $record && in_array($record->status, ['pending', 'under_review']);
+                ?>
+
+                <?php if ($isPending): ?>
+                    <!-- Approve button -->
+                    <button
+                        type="button"
+                        class="btn btn-success"
+                        data-request="onApprove"
+                        data-request-data="record_id: <?= (int) $record->id ?>"
+                        data-request-confirm="Approve this dispute? The current claim will be revoked and ownership transferred to this claimant."
+                        data-load-indicator="Approving...">
+                        Approve &amp; Transfer Claim
+                    </button>
+
+                    <!-- Reject button -->
+                    <button
+                        type="button"
+                        class="btn btn-danger"
+                        data-request="onReject"
+                        data-request-data="record_id: <?= (int) $record->id ?>"
+                        data-request-confirm="Reject this dispute? The existing claim will remain active."
+                        data-load-indicator="Rejecting...">
+                        Reject Dispute
+                    </button>
+                <?php endif ?>
+
+                <!-- Save notes/status manually -->
+                <button
+                    type="submit"
+                    data-request="onSave"
+                    data-request-data="redirect:0"
+                    data-hotkey="ctrl+s, cmd+s"
+                    data-load-indicator="<?= e(trans('backend::lang.form.saving')) ?>"
+                    class="btn btn-default">
+                    <?= e(trans('backend::lang.form.save')) ?>
+                </button>
+
+                <?php if ($record && $record->document_path): ?>
+                    <!-- Download document -->
+                    <a
+                        href="<?= Backend::url('websquids/gymdirectory/gymclaimdisputes/download/' . $record->id) ?>"
+                        class="btn btn-default wn-icon-download"
+                        target="_blank">
+                        Download Document
+                    </a>
+                <?php endif ?>
+
+                <span class="btn-text">
+                    <?= e(trans('backend::lang.form.or')) ?>
+                    <a href="<?= Backend::url('websquids/gymdirectory/gymclaimdisputes') ?>"><?= e(trans('backend::lang.form.cancel')) ?></a>
+                </span>
+            </div>
+        </div>
+
+    <?= Form::close() ?>
+
+<?php else: ?>
+    <p class="flash-message static error"><?= e(trans($this->fatalError)) ?></p>
+    <p><a href="<?= Backend::url('websquids/gymdirectory/gymclaimdisputes') ?>" class="btn btn-default"><?= e(trans('backend::lang.form.return_to_list')) ?></a></p>
+<?php endif ?>

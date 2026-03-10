@@ -12,7 +12,7 @@ class CreateGymClaimDisputesTable extends Migration
             $table->increments('id')->unsigned();
             $table->integer('gym_id')->unsigned()->index();
             // The approved claim being disputed
-            $table->integer('existing_claim_id')->unsigned()->index();
+            $table->integer('existing_claim_id')->unsigned()->index('gym_disputes_claim_id_index');
             $table->string('full_name');
             $table->string('job_title');
             $table->string('business_email');
