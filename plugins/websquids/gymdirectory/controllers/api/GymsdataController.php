@@ -75,19 +75,22 @@ class GymsdataController extends Controller
         return ['reviews_per_score'];
     }
 
+    /** Main columns used to define "complete" sample rows (name, address, location, contact). */
+    protected function getGymsMainColumns(): array
+    {
+        return [
+            'business_name', 'full_address', 'city', 'state', 'type',
+            'email_1', 'business_phone', 'business_website',
+        ];
+    }
+
     /**
-     * Restrict query to rows where every export column is non-null; text columns must also be non-empty (complete data for sample).
-     * Matches gyms schema: text (non-empty), int4/numeric (non-null), jsonb (non-null).
+     * Restrict query to rows where all main columns are non-null and non-empty (complete data for sample).
      */
     protected function applyCompleteDataScope($query): void
     {
-        $numeric = array_fill_keys($this->getGymsNumericColumns(), true);
-        $jsonb = array_fill_keys($this->getGymsJsonbColumns(), true);
-        foreach ($this->getGymsExportColumns() as $col) {
-            $query->whereNotNull($col);
-            if (!isset($numeric[$col]) && !isset($jsonb[$col])) {
-                $query->where($col, '!=', '');
-            }
+        foreach ($this->getGymsMainColumns() as $col) {
+            $query->whereNotNull($col)->where($col, '!=', '');
         }
     }
 
