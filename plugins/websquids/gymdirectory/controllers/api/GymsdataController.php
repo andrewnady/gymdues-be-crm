@@ -10,8 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Stripe;
 use Stripe\Webhook;
@@ -77,27 +75,31 @@ class GymsdataController extends Controller
         return ['reviews_per_score'];
     }
 
+    /** Main columns used to define "complete" sample rows (name, address, location, contact). */
+    protected function getGymsMainColumns(): array
+    {
+        return [
+            'business_name', 'full_address', 'city', 'state', 'type',
+            'email_1', 'business_phone', 'business_website',
+        ];
+    }
+
     /**
-     * Restrict query to rows where every export column is non-null; text columns must also be non-empty (complete data for sample).
-     * Matches gyms schema: text (non-empty), int4/numeric (non-null), jsonb (non-null).
+     * Restrict query to rows where all main columns are non-null and non-empty (complete data for sample).
      */
     protected function applyCompleteDataScope($query): void
     {
-        $numeric = array_fill_keys($this->getGymsNumericColumns(), true);
-        $jsonb = array_fill_keys($this->getGymsJsonbColumns(), true);
-        foreach ($this->getGymsExportColumns() as $col) {
-            $query->whereNotNull($col);
-            if (!isset($numeric[$col]) && !isset($jsonb[$col])) {
-                $query->where($col, '!=', '');
-            }
+        foreach ($this->getGymsMainColumns() as $col) {
+            $query->whereNotNull($col)->where($col, '!=', '');
         }
     }
 
-    /** Write one row to the sheet at $rowNum for the given $row object using export columns. */
-    protected function writeGymsExcelRow($sheet, $row, int $rowNum): void
+    /** Get one row as array of string values in export column order (for CSV export). */
+    protected function rowToExportValues($row): array
     {
         $cols = $this->getGymsExportColumns();
-        foreach ($cols as $colIndex => $key) {
+        $out = [];
+        foreach ($cols as $key) {
             $value = $row->{$key} ?? null;
             if ($value === null) {
                 $value = '';
@@ -106,59 +108,52 @@ class GymsdataController extends Controller
             } else {
                 $value = (string) $value;
             }
-            $sheet->setCellValueByColumnAndRow($colIndex + 1, $rowNum, $value);
+            $out[] = $value;
         }
+        return $out;
     }
 
     /**
-     * Build an Excel file from gym rows with all export columns.
+     * Build a CSV file from gym rows (iterable) with all export columns.
      * Returns path to the written temp file (caller should unlink when done).
      */
-    protected function buildGymsExcelPath(iterable $rows, ?string $path = null): string
+    protected function buildGymsCsvPath(iterable $rows, ?string $path = null): string
     {
-        $path = $path ?: tempnam(sys_get_temp_dir(), 'gymdues_data_') . '.xlsx';
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Gyms');
+        $path = $path ?: tempnam(sys_get_temp_dir(), 'gymdues_data_') . '.csv';
         $cols = $this->getGymsExportColumns();
-        foreach ($cols as $colIndex => $header) {
-            $sheet->setCellValueByColumnAndRow($colIndex + 1, 1, $header);
+        $fh = fopen($path, 'w');
+        if (! $fh) {
+            throw new \RuntimeException('Could not open temp file for CSV export');
         }
-        $rowNum = 2;
+        fputcsv($fh, $cols);
         foreach ($rows as $row) {
-            $this->writeGymsExcelRow($sheet, $row, $rowNum);
-            $rowNum++;
+            fputcsv($fh, $this->rowToExportValues($row));
         }
-        $writer = new Xlsx($spreadsheet);
-        $writer->save($path);
+        fclose($fh);
         return $path;
     }
 
     /**
-     * Build full gyms Excel by chunking (for purchase). Returns path to temp file.
+     * Build full gyms CSV by streaming chunked query (constant memory; for purchase exports).
      * Filter by data_state+data_city, or data_state only, or data_type only, else full data.
      */
-    protected function buildFullGymsExcelPath(?string $path = null, ?string $dataState = null, ?string $dataCity = null, ?string $dataType = null): string
+    protected function buildFullGymsCsvPath(?string $path = null, ?string $dataState = null, ?string $dataCity = null, ?string $dataType = null): string
     {
-        $path = $path ?: tempnam(sys_get_temp_dir(), 'gymdues_data_full_') . '.xlsx';
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Gyms');
+        $path = $path ?: tempnam(sys_get_temp_dir(), 'gymdues_data_full_') . '.csv';
         $cols = $this->getGymsExportColumns();
-        foreach ($cols as $colIndex => $header) {
-            $sheet->setCellValueByColumnAndRow($colIndex + 1, 1, $header);
-        }
-        $rowNum = 2;
         $query = $this->table()->select($cols)->orderBy('id');
         $this->applyDataScope($query, $dataState, $dataCity, $dataType);
-        $query->chunk(2000, function ($rows) use ($sheet, &$rowNum) {
+        $fh = fopen($path, 'w');
+        if (!$fh) {
+            throw new \RuntimeException('Could not open temp file for CSV export');
+        }
+        fputcsv($fh, $cols);
+        $query->chunk(2000, function ($rows) use ($fh) {
             foreach ($rows as $row) {
-                $this->writeGymsExcelRow($sheet, $row, $rowNum);
-                $rowNum++;
+                fputcsv($fh, $this->rowToExportValues($row));
             }
         });
-        $writer = new Xlsx($spreadsheet);
-        $writer->save($path);
+        fclose($fh);
         return $path;
     }
 
@@ -207,6 +202,64 @@ class GymsdataController extends Controller
         return $states[$name] ?? $states[$key] ?? $name;
     }
 
+    protected function stateImage(string $stateCode): string
+    {
+        $images = [
+            'AL' => '/alabama.webp',
+            'AK' => '/alaska.webp',
+            'AZ' => '/Arizona.jpg',
+            'AR' => '/Arkansas.webp',
+            'CA' => '/California.webp',
+            'CO' => '/Colorado.jpg',
+            'CT' => '/Connecticut 3.jpg',
+            'DC' => '/District of Columbia.jpg',
+            'DE' => '/Delaware 3.avif',
+            'FL' => '/Florida.avif',
+            'GA' => '/Georgia.webp',
+            'HI' => '/Hawaii.webp',
+            'IA' => '/Iowa.webp',
+            'ID' => '/Idaho.jpg',
+            'IL' => '/Illinois.jpg',
+            'IN' => '/Indiana.jpg',
+            'KS' => '/best-kansas-gyms.jpg',
+            'KY' => '/Kentucky.webp',
+            'LA' => '/Louisiana.webp',
+            'MA' => '/Massachusetts.jpeg',
+            'ME' => '/Maine.jpg',
+            'MD' => '/Maryland.jpeg',
+            'MI' => '/Michigan 2.webp',
+            'MN' => '/Minnesota.webp',
+            'MS' => '/Mississippi.webp',
+            'MO' => '/Missouri 2.webp',
+            'MT' => '/Montana.jpg',
+            'NE' => '/Nebraska 2.webp',
+            'NV' => '/Nevada.webp',
+            'NH' => '/Hampshire.jpg',
+            'NJ' => '/New Jersey 3.webp',
+            'NM' => '/New Mexico.jpg',
+            'NY' => '/New York.jpg',
+            'NC' => '/North Carolina.jpg',
+            'ND' => '/North Carolina.jpg',
+            'OH' => '/Ohio.jpg',
+            'OK' => '/Oklahoma 2.jpg',
+            'OR' => '/Oregon 3.webp',
+            'PA' => '/Pennsylvania.webp',
+            'RI' => '/Rhode Island 2.jpg',
+            'SC' => '/South Carolina.jpg',
+            'SD' => '/South Dakota.jpg',
+            'TN' => '/Tennessee.jpg',
+            'TX' => '/Texas.jpg',
+            'UT' => '/Utah.webp',
+            'VT' => '/Vermont.jpg',
+            'VA' => '/Virginia.avif',
+            'WA' => '/Washington 2.jpg',
+            'WV' => '/West Virginia.jpeg',
+            'WI' => '/Wisconsin.jpg',
+            'WY' => '/Wyoming.jpg',
+        ];
+        return $images[$stateCode] ?? '/images/bg-header.jpg';
+    }
+
     /** Escape LIKE wildcards (% and _) for PostgreSQL. */
     protected function escapeLike(string $value): string
     {
@@ -230,6 +283,12 @@ class GymsdataController extends Controller
     protected function normalizeCitySlug(string $slug): string
     {
         return ucwords(str_replace('-', ' ', $slug));
+    }
+
+    /** Name to URL slug: lowercase, spaces → hyphens (e.g. "Costa Mesa" → "costa-mesa", "Health Clubs" → "health-clubs"). */
+    protected function slugFromName(string $name): string
+    {
+        return strtolower(preg_replace('/\s+/', '-', trim($name)));
     }
 
     /**
@@ -301,7 +360,7 @@ class GymsdataController extends Controller
                     'stateSlug' => $this->stateSlug($row->state),
                     'count' => $count,
                     'pct' => $pct,
-                    'imageUrl' => $this->stateImageUrl($row->state),
+                    'imageUrl' => $this->stateImage($row->state),
                 ];
             });
 
@@ -355,6 +414,7 @@ class GymsdataController extends Controller
                     'city' => $row->city,
                     'state' => $row->state,
                     'stateName' => $this->stateNames($row->state),
+                    'imageUrl' => $this->stateImage($row->state),
                     'postal_code' => $postal,
                     'count' => (int) $row->count,
                 ];
@@ -397,7 +457,7 @@ class GymsdataController extends Controller
                     'stateSlug' => $this->stateSlug($row->state),
                     'count' => $count,
                     'pct' => $pct,
-                    'imageUrl' => $this->stateImageUrl($row->state),
+                    'imageUrl' => $this->stateImage($row->state),
                 ];
             });
 
@@ -499,6 +559,7 @@ class GymsdataController extends Controller
                     'city' => $row->city,
                     'state' => $row->state ?? $stateCode,
                     'stateName' => $this->stateNames($row->state ?? $stateCode),
+                    'imageUrl' => $this->stateImage($row->state ?? $stateCode),
                     'postal_code' => $postal,
                     'count' => (int) $row->count,
                 ];
@@ -526,23 +587,22 @@ class GymsdataController extends Controller
         try {
             $limit = max(1, min(50, (int) $request->input('limit', 10)));
             $rows = $this->table()
-                ->selectRaw("city, state, COALESCE(postal_code, '') as postal_code, count(*) as count")
+                ->selectRaw("city, state, count(*) as count")
                 ->whereNotNull('city')->where('city', '!=', '')
                 ->whereNotNull('state')->where('state', '!=', '')
-                ->groupBy('city', 'state', 'postal_code')
+                ->groupBy('city', 'state')
                 ->orderByRaw('count(*) desc')
                 ->limit($limit)
                 ->get();
 
             $cities = $rows->values()->map(function ($row, $index) {
-                $postal = $row->postal_code ?? '';
-                $label = trim($row->city . ', ' . $this->stateNames($row->state) . ($postal !== '' ? ' ' . $postal : ''));
+                $label = trim($row->city . ', ' . $this->stateNames($row->state));
                 return [
                     'rank' => $index + 1,
                     'city' => $row->city,
                     'state' => $row->state,
                     'stateName' => $this->stateNames($row->state),
-                    'postal_code' => $postal,
+                    'imageUrl' => $this->stateImage($row->state),
                     'label' => $label,
                     'count' => (int) $row->count,
                 ];
@@ -667,6 +727,7 @@ class GymsdataController extends Controller
                         'city' => $row->city,
                         'state' => $row->state,
                         'stateName' => $this->stateNames($row->state),
+                        'imageUrl' => $this->stateImage($row->state),
                         'label' => trim($row->city . ', ' . $row->state),
                         'growth' => (int) $row->growth,
                         'count' => (int) $row->growth,
@@ -695,6 +756,7 @@ class GymsdataController extends Controller
                 'city' => $row->city,
                 'state' => $row->state,
                 'stateName' => $this->stateNames($row->state),
+                'imageUrl' => $this->stateImage($row->state),
                 'label' => trim($row->city . ', ' . $row->state),
                 'growth' => $count,
                 'count' => $count,
@@ -917,6 +979,62 @@ class GymsdataController extends Controller
     }
 
     /**
+     * GET /api/v1/gymsdata/sitemap
+     * Returns all URL path segments for the gymsdata sitemap (relative to gymsdata domain, no leading slash).
+     * Frontend uses this to build sitemap index and chunk files in one call. Cached 1 hour.
+     * Paths: "" (root), "gymsdata" (main), "gymsdata/trends", "gymsdata/{state-slug}", "gymsdata/{state-slug}/{city-slug}", "gymsdata/types/{type-slug}".
+     */
+    public function sitemap(Request $request)
+    {
+        $cacheKey = 'gymsdata_sitemap_paths';
+        $paths = Cache::remember($cacheKey, 3600, function () {
+            $pathSet = [];
+            $pathSet[''] = true;
+            $pathSet['gymsdata'] = true;
+            $pathSet['gymsdata/trends'] = true;
+
+            $stateRows = $this->table()
+                ->select('state')
+                ->whereNotNull('state')->where('state', '!=', '')
+                ->distinct()
+                ->pluck('state');
+            foreach ($stateRows as $stateCode) {
+                $pathSet['gymsdata/' . $this->stateSlug($stateCode)] = true;
+            }
+
+            $cityRows = $this->table()
+                ->select('state', 'city')
+                ->whereNotNull('state')->where('state', '!=', '')
+                ->whereNotNull('city')->where('city', '!=', '')
+                ->distinct()
+                ->get();
+            foreach ($cityRows as $row) {
+                $pathSet['gymsdata/' . $this->stateSlug($row->state) . '/' . $this->slugFromName($row->city)] = true;
+            }
+
+            $typeRows = $this->table()
+                ->select('type')
+                ->whereNotNull('type')->where('type', '!=', '')
+                ->distinct()
+                ->pluck('type');
+            foreach ($typeRows as $typeName) {
+                $pathSet['gymsdata/types/' . $this->slugFromName($typeName)] = true;
+            }
+
+            $out = [''];
+            if (isset($pathSet['gymsdata'])) {
+                $out[] = 'gymsdata';
+            }
+            unset($pathSet[''], $pathSet['gymsdata']);
+            $rest = array_keys($pathSet);
+            sort($rest);
+            return array_merge($out, $rest);
+        });
+
+        return response()->json($paths);
+    }
+
+    /**
      * GET /api/v1/gymsdata/testimonials
      * "What Our Users Say" — testimonial cards (quote, rating, author, initials for avatar).
      */
@@ -1057,12 +1175,12 @@ class GymsdataController extends Controller
                     'state' => $code,
                     'stateName' => $this->stateNames($code),
                     'stateSlug' => $this->stateSlug($code),
+                    'imageUrl' => $this->stateImage($code),
                     'totalGyms' => $totalGyms,
                     'withEmail' => $withEmail,
                     'withPhone' => $withPhone,
                     'avgRating' => $avgRating,
                     'densityPer100k' => $densityPer100k,
-                    'imageUrl' => $this->stateImageUrl($code),
                 ];
             })->values()->all();
         } finally {
@@ -1109,6 +1227,7 @@ class GymsdataController extends Controller
                     'state' => $code,
                     'stateName' => $this->stateNames($code),
                     'stateSlug' => $this->stateSlug($code),
+                    'imageUrl' => $this->stateImage($code),
                     'totalGyms' => 0,
                     'price' => $this->getPriceForRowCount(0),
                     'formattedPrice' => '$' . number_format($this->getPriceForRowCount(0)),
@@ -1118,7 +1237,6 @@ class GymsdataController extends Controller
                     'pctWithSocial' => 0,
                     'avgRating' => null,
                     'topCities' => [],
-                    'imageUrl' => $this->stateImageUrl($code),
                 ];
                 if ($includeCities) {
                     $payload['cities'] = [];
@@ -1174,6 +1292,7 @@ class GymsdataController extends Controller
                 'state' => $code,
                 'stateName' => $this->stateNames($code),
                 'stateSlug' => $this->stateSlug($code),
+                'imageUrl' => $this->stateImage($code),
                 'totalGyms' => $totalGyms,
                 'price' => $statePrice,
                 'formattedPrice' => '$' . number_format($statePrice),
@@ -1183,7 +1302,6 @@ class GymsdataController extends Controller
                 'pctWithSocial' => $pctWithSocial,
                 'avgRating' => $avgRating,
                 'topCities' => $topCities,
-                'imageUrl' => $this->stateImageUrl($code),
             ];
 
             if ($includeCities) {
@@ -1203,6 +1321,7 @@ class GymsdataController extends Controller
                         'city' => $row->city,
                         'state' => $row->state ?? $code,
                         'stateName' => $this->stateNames($row->state ?? $code),
+                        'imageUrl' => $this->stateImage($row->state ?? $code),
                         'postal_code' => '',
                         'count' => $count,
                         'price' => $price,
@@ -1260,6 +1379,7 @@ class GymsdataController extends Controller
                     'state' => $code,
                     'stateName' => $this->stateNames($code),
                     'stateSlug' => $this->stateSlug($code),
+                    'imageUrl' => $this->stateImage($code),
                     'city' => $this->normalizeCitySlug($citySlug),
                     'totalGyms' => 0,
                     'price' => $minPrice,
@@ -1270,7 +1390,6 @@ class GymsdataController extends Controller
                     'avgRating' => null,
                     'topAreas' => [],
                     'nearbyCities' => [],
-                    'imageUrl' => $this->stateImageUrl($code),
                 ]);
             }
 
@@ -1338,6 +1457,7 @@ class GymsdataController extends Controller
                 'state' => $code,
                 'stateName' => $this->stateNames($code),
                 'stateSlug' => $this->stateSlug($code),
+                'imageUrl' => $this->stateImage($code),
                 'city' => $cityDisplay,
                 'totalGyms' => $totalGyms,
                 'price' => $cityPrice,
@@ -1348,7 +1468,6 @@ class GymsdataController extends Controller
                 'avgRating' => $avgRating,
                 'topAreas' => $topAreas,
                 'nearbyCities' => $nearbyCities,
-                'imageUrl' => $this->stateImageUrl($code),
             ]);
         } catch (\Exception $e) {
             Log::error('GymsdataController@cityPage: ' . $e->getMessage(), [
@@ -1415,11 +1534,11 @@ class GymsdataController extends Controller
                     'state' => $row->state,
                     'stateName' => $this->stateNames($row->state),
                     'stateSlug' => $this->stateSlug($row->state),
+                    'imageUrl' => $this->stateImage($row->state),
                     'count' => $count,
                     'pct' => $pct,
                     'price' => $price,
                     'formattedPrice' => '$' . number_format($price),
-                    'imageUrl' => $this->stateImageUrl($row->state),
                 ];
             });
 
@@ -1465,6 +1584,7 @@ class GymsdataController extends Controller
                     'city' => $row->city ?? '',
                     'state' => $row->state ?? '',
                     'stateName' => $this->stateNames($row->state ?? ''),
+                    'imageUrl' => $this->stateImage($row->state ?? ''),
                     'email' => $row->email_1 ?? '',
                     'phone' => $row->business_phone ?? '',
                     'website' => $row->business_website ?? '',
@@ -1580,6 +1700,7 @@ class GymsdataController extends Controller
                         'city' => $row->city ?? null,
                         'state' => $row->state ?? null,
                         'stateName' => $this->stateNames($row->state),
+                        'imageUrl' => $this->stateImage($row->state ?? ''),
                         'postal_code' => $row->postal_code ?? null,
                         'latitude' => isset($row->latitude) ? (float) $row->latitude : null,
                         'longitude' => isset($row->longitude) ? (float) $row->longitude : null,
@@ -1647,17 +1768,17 @@ class GymsdataController extends Controller
             $this->applyCompleteDataScope($query);
             $this->applyDataScope($query, $request->input('state'), $request->input('city'), $request->input('type'));
             $sampleRows = $query->get();
-            $path = $this->buildGymsExcelPath($sampleRows);
-            $filename = 'gymdues-sample.xlsx';
+            $path = $this->buildGymsCsvPath($sampleRows);
+            $filename = 'gymdues-sample.csv';
             $toEmail = $request->input('email');
             $toName = $request->input('name');
-            /* Mail::raw('Please find your gyms sample data attached.', function ($message) use ($path, $filename, $toEmail, $toName) {
+            /* Mail::raw('Please find your gyms sample data attached (CSV).', function ($message) use ($path, $filename, $toEmail, $toName) {
                 $message->to($toEmail, $toName)
                     ->subject('Your gyms sample data');
-                $message->attach($path, ['as' => $filename, 'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+                $message->attach($path, ['as' => $filename, 'mime' => 'text/csv']);
             }); */
             return response()->download($path, $filename, [
-                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Type' => 'text/csv',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             if ($path && is_file($path)) {
@@ -1714,6 +1835,7 @@ class GymsdataController extends Controller
             ];
             $id = $conn->table('downloads')->insertGetId($purchaseInsert);
             Stripe::setApiKey($key);
+            // e.g. GYMSDATA_FRONTEND_URL=https://gymsdata.gymdues.com for gymsdata subdomain
             $frontendOrigin = rtrim(env('GYMSDATA_FRONTEND_URL', env('APP_URL', '')), '/');
             $successUrl = $frontendOrigin . '/gymsdata/checkout/success?session_id={CHECKOUT_SESSION_ID}';
             $cancelUrl = $frontendOrigin . '/gymsdata/checkout/cancel';
@@ -1750,6 +1872,7 @@ class GymsdataController extends Controller
                 'client_reference_id' => (string) $id,
                 'customer_email' => $request->input('email'),
                 'metadata' => ['download_id' => (string) $id],
+                'payment_intent_data' => ['metadata' => ['download_id' => (string) $id]],
             ]);
             $conn->table('downloads')->where('id', $id)->update([
                 'stripe_checkout_session_id' => $session->id,
@@ -1768,7 +1891,8 @@ class GymsdataController extends Controller
 
     /**
      * POST /api/v1/webhooks/stripe/gymsdata-purchase
-     * Stripe webhook (no API key). On checkout.session.completed: set payment_status=paid, send data email, set email_sent_at.
+     * Stripe webhook. On charge.succeeded: set payment_status=paid, send data email, set email_sent_at.
+     * Uses PaymentIntent metadata (download_id) set at checkout; configure Stripe to send charge.succeeded to this URL.
      */
     public function stripeWebhook(Request $request)
     {
@@ -1785,24 +1909,35 @@ class GymsdataController extends Controller
             Log::warning('GymsdataController@stripeWebhook: signature verification failed');
             return response()->json(['error' => 'Invalid signature'], 400);
         } catch (\Exception $e) {
+            Log::error('GymsdataController@stripeWebhook: ' . $e->getMessage());
             return response()->json(['error' => 'Webhook error'], 400);
         }
-        if ($event->type !== 'checkout.session.completed') {
+        if ($event->type !== 'charge.succeeded') {
             return response()->json(['received' => true]);
         }
-        $session = $event->data->object;
-        $sessionId = $session->id ?? null;
-        if (! $sessionId) {
+        $charge = $event->data->object;
+        $paymentIntentId = $charge->payment_intent ?? null;
+        if (! $paymentIntentId) {
             return response()->json(['received' => true]);
         }
         try {
+            $key = env('STRIPE_SECRET');
+            if (! $key) {
+                return response()->json(['error' => 'Server configuration error'], 500);
+            }
+            Stripe::setApiKey($key);
+            $pi = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+            $downloadId = $pi->metadata->download_id ?? null;
+            if (! $downloadId || ! is_numeric($downloadId)) {
+                return response()->json(['received' => true]);
+            }
             $conn = DB::connection('gymsdata');
             $row = $conn->table('downloads')
-                ->where('stripe_checkout_session_id', $sessionId)
+                ->where('id', (int) $downloadId)
                 ->where('type', 'purchase')
                 ->first();
             if (! $row) {
-                Log::warning('GymsdataController@stripeWebhook: no row for session ' . $sessionId);
+                Log::warning('GymsdataController@stripeWebhook: no download for id ' . $downloadId);
                 return response()->json(['received' => true]);
             }
             $conn->table('downloads')->where('id', $row->id)->update([
@@ -1848,7 +1983,8 @@ class GymsdataController extends Controller
     }
 
     /**
-     * Send full gyms data as Excel to customer email for a paid purchase. Sets email_sent_at on success.
+     * Send full gyms data as CSV to customer email for a paid purchase (streaming export to avoid memory exhaustion).
+     * Sets email_sent_at on success.
      */
     protected function sendPurchaseDataToEmail(int $downloadId): void
     {
@@ -1864,20 +2000,20 @@ class GymsdataController extends Controller
         $dataType = $row->data_type ?? null;
         $path = null;
         try {
-            $path = $this->buildFullGymsExcelPath(null, $dataState, $dataCity, $dataType);
+            $path = $this->buildFullGymsCsvPath(null, $dataState, $dataCity, $dataType);
             if ($dataState && $dataCity) {
-                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataState)) . '-' . strtolower(preg_replace('/\s+/', '-', $dataCity)) . '.xlsx';
+                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataState)) . '-' . strtolower(preg_replace('/\s+/', '-', $dataCity)) . '.csv';
             } elseif ($dataState) {
-                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataState)) . '.xlsx';
+                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataState)) . '.csv';
             } elseif ($dataType) {
-                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataType)) . '.xlsx';
+                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataType)) . '.csv';
             } else {
-                $filename = 'gymdues-full-data.xlsx';
+                $filename = 'gymdues-full-data.csv';
             }
-            /* Mail::raw('Thank you for your purchase. Your full gyms data is attached.', function ($message) use ($path, $filename, $email, $name) {
+            /* Mail::raw('Thank you for your purchase. Your full gyms data is attached (CSV; open in Excel or any spreadsheet app).', function ($message) use ($path, $filename, $email, $name) {
                 $message->to($email, $name)
                     ->subject('Your gymdues data download');
-                $message->attach($path, ['as' => $filename, 'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+                $message->attach($path, ['as' => $filename, 'mime' => 'text/csv']);
             }); */
             $conn->table('downloads')->where('id', $downloadId)->update([
                 'email_sent_at' => now(),

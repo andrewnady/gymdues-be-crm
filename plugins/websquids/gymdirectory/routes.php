@@ -25,6 +25,7 @@ Route::prefix('api/v1')
       Route::post('sample-download', [GymsdataController::class, 'sampleDownload']);
       Route::post('checkout', [GymsdataController::class, 'createCheckout']);
       Route::post('resend-purchase-email', [GymsdataController::class, 'resendPurchaseEmail']);
+      Route::get('sitemap', [GymsdataController::class, 'sitemap']);
       Route::get('list-page', [GymsdataController::class, 'listPage']);
       Route::get('state-comparison', [GymsdataController::class, 'stateComparison']);
       Route::get('state-page/{state}', [GymsdataController::class, 'statePage'])->where('state', '[a-z0-9\-]+');
