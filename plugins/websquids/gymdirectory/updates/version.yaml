@@ -119,3 +119,6 @@
 1.0.41:
     - 'Create gym_claim_requests table for the Claim Your Gym feature'
     - create_gym_claim_requests_table.php
+1.0.42:
+    - 'Create gym_claim_disputes table for the Claim Dispute feature'
+    - create_gym_claim_disputes_table.php

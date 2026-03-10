@@ -77,8 +77,10 @@ class GymClaimsController extends Controller
 
         if ($alreadyClaimed) {
             return response()->json([
-                'success' => false,
-                'message' => 'This gym has already been claimed. If you believe this is an error, please contact support.',
+                'success'           => false,
+                'already_claimed'   => true,
+                'dispute_available' => true,
+                'message'           => 'This business has already been claimed. If you believe this is an error, submit a dispute.',
             ], 409);
         }
 

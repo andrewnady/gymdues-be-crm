@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use websquids\Gymdirectory\Classes\ApiKeyMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsController;
 use Websquids\Gymdirectory\Controllers\Api\GymClaimsController;
+use Websquids\Gymdirectory\Controllers\Api\GymDisputesController;
 use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
@@ -88,4 +89,12 @@ Route::prefix('api/v1')
     Route::post('gym-claims/{id}/send-phone-code', [GymClaimsController::class, 'sendPhoneCode'])->where('id', '[0-9]+');
     Route::post('gym-claims/{id}/verify-phone', [GymClaimsController::class, 'verifyPhone'])->where('id', '[0-9]+');
     Route::post('gym-claims/{id}/upload-document', [GymClaimsController::class, 'uploadDocument'])->where('id', '[0-9]+');
+
+    // Gym dispute routes (filed when gym is already claimed)
+    Route::post('gym-disputes', [GymDisputesController::class, 'initiate']);
+    Route::get('gym-disputes/{id}', [GymDisputesController::class, 'status'])->where('id', '[0-9]+');
+    Route::post('gym-disputes/{id}/upload-document', [GymDisputesController::class, 'uploadDocument'])->where('id', '[0-9]+');
+    // Admin-only dispute resolution
+    Route::post('gym-disputes/{id}/approve', [GymDisputesController::class, 'approve'])->where('id', '[0-9]+');
+    Route::post('gym-disputes/{id}/reject', [GymDisputesController::class, 'reject'])->where('id', '[0-9]+');
   });
