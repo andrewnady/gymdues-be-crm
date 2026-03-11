@@ -669,8 +669,9 @@ class GymsController extends Controller {
                                    : !empty($gym->hours),
 
         // 5. Owner has replied to at least one review
-        //    (placeholder — set to false until review-reply feature is built)
-        'has_review_response' => false,
+        'has_review_response' => $gym->reviews instanceof \Illuminate\Support\Collection
+                                   ? $gym->reviews->contains(fn($r) => !empty($r->owner_response))
+                                   : false,
       ];
 
       $gym->profile_checklist = $checklist;

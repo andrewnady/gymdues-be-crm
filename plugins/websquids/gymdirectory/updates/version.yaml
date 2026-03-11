@@ -122,13 +122,17 @@
 1.0.42:
     - 'Add type and amount columns to downloads (sample vs purchase)'
     - update_gymsdata_sample_downloads_add_type_and_amount.php
+    - 'Create gym_claim_disputes table for the Claim Dispute feature'
+    - create_gym_claim_disputes_table.php
 1.0.43:
-    - 'Add Stripe checkout + payment_status + email_sent_at to downloads'
-    - update_gymsdata_sample_downloads_stripe_and_email_sent.php
+    - 'Add user_id to gym_claim_requests to link approved owners to their Winter.User account'
+    - add_user_id_to_gym_claim_requests.php
 1.0.44:
-    - 'Rename sample_downloads to downloads (existing installs)'
-    - rename_gymsdata_sample_downloads_to_downloads.php
+    - 'Create gym_owner_tokens table for magic login and session bearer tokens'
+    - create_gym_owner_tokens_table.php
 1.0.45:
+    - 'Add owner_response and owner_responded_at to reviews for gym owner reply feature'
+    - add_owner_response_to_reviews.php
     - 'Add data_state, data_type to downloads (state or type page context; full when both null)'
     - update_gymsdata_downloads_add_data_scope_columns.php
 1.0.46:
