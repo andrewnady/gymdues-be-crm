@@ -101,6 +101,7 @@ class GymOwnerAuthController extends Controller
             'gym' => $claim ? [
                 'id'   => $claim->gym_id,
                 'name' => $claim->gym->name ?? null,
+                'slug' => $claim->gym->slug ?? null,
             ] : null,
         ]);
     }
@@ -190,6 +191,7 @@ class GymOwnerAuthController extends Controller
             'gym' => [
                 'id'   => $claim->gym_id,
                 'name' => $claim->gym->name ?? null,
+                'slug' => $claim->gym->slug ?? null,
             ],
         ]);
     }
@@ -214,6 +216,7 @@ class GymOwnerAuthController extends Controller
             'gym' => $claim ? [
                 'id'   => $claim->gym_id,
                 'name' => $claim->gym->name ?? null,
+                'slug' => $claim->gym->slug ?? null,
             ] : null,
         ]);
     }

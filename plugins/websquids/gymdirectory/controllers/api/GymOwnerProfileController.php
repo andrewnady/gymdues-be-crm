@@ -278,6 +278,7 @@ class GymOwnerProfileController extends Controller
                 'price'       => $plan->price,
                 'frequency'   => $plan->frequency,
                 'description' => $plan->description,
+                'address_id'  => $plan->address_id,
             ],
         ], 201);
     }
@@ -319,6 +320,7 @@ class GymOwnerProfileController extends Controller
                 'price'       => $plan->price,
                 'frequency'   => $plan->frequency,
                 'description' => $plan->description,
+                'address_id'  => $plan->address_id,
             ],
         ]);
     }
@@ -424,9 +426,10 @@ class GymOwnerProfileController extends Controller
         }
 
         return response()->json([
-            'success' => true,
-            'message' => 'Operating hours updated successfully.',
-            'hours'   => $saved,
+            'success'    => true,
+            'message'    => 'Operating hours updated successfully.',
+            'hours'      => $saved,
+            'address_id' => $addressId,
         ]);
     }
 

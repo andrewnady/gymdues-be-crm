@@ -236,10 +236,15 @@ class GymClaimsController extends Controller
 
     /**
      * POST /api/v1/gym-claims/{id}/send-phone-code
-     * Sends a 6-digit OTP via SMS to the gym's listed business phone number.
+     * Body: { "phone_number": "+1xxxxxxxxxx" }
+     * Sends a 6-digit OTP via SMS to the phone number provided by the frontend.
      */
     public function sendPhoneCode(Request $request, $id)
     {
+        $request->validate([
+            'phone_number' => 'required|string|max:50',
+        ]);
+
         $claim = $this->findActiveClaim($id);
         if (!$claim) {
             return $this->notFound();
@@ -250,15 +255,7 @@ class GymClaimsController extends Controller
         }
 
         $gym   = Gym::findOrFail($claim->gym_id);
-        // $phone = $this->getGymPhone($gym);
-        $phone = '+18777804236';
-
-        if (!$phone) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No business phone number is on file for this gym.',
-            ], 422);
-        }
+        $phone = $request->input('phone_number');
 
         // Update method and send code
         $claim->verification_method = GymClaimRequest::METHOD_PHONE_SMS;
@@ -278,8 +275,7 @@ class GymClaimsController extends Controller
 
         return response()->json([
             'success' => true,
-            // Do not expose the actual phone number; mask it for privacy
-            'message' => 'A verification code has been sent to the business phone number on file.',
+            'message' => 'A verification code has been sent to the provided phone number.',
         ]);
     }
 
@@ -487,33 +483,6 @@ class GymClaimsController extends Controller
     private function gymHasPhone(Gym $gym): bool
     {
         return $this->getGymPhone($gym) !== null;
-    }
-
-    /**
-     * Get the gym's primary business_phone contact value.
-     */
-    private function getGymPhone(Gym $gym): ?string
-    {
-        $contact = Contact::where('gym_id', $gym->id)
-            ->where('type', 'business_phone')
-            ->whereNotNull('value')
-            ->first();
-
-        if ($contact) {
-            return $contact->value;
-        }
-
-        $addressIds = $gym->addresses()->pluck('id');
-        if ($addressIds->isNotEmpty()) {
-            $contact = Contact::whereIn('address_id', $addressIds)
-                ->where('type', 'business_phone')
-                ->whereNotNull('value')
-                ->first();
-
-            return $contact?->value;
-        }
-
-        return null;
     }
 
     /**
