@@ -134,3 +134,6 @@
 1.0.46:
     - 'Add data_city to downloads (city page: state + city)'
     - update_gymsdata_downloads_add_data_city.php
+1.0.47:
+    - 'Create winter_blog_comments table if missing for comments API'
+    - create_winter_blog_comments_table_if_missing.php
