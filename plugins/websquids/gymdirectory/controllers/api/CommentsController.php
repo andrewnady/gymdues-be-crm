@@ -5,7 +5,7 @@ namespace Websquids\Gymdirectory\Controllers\Api;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Winter\Blog\Models\Post;
-use Winter\Blog\Models\Comment;
+use Websquids\Gymdirectory\Models\Comment;
 
 /**
  * Custom blog comments API controller (lives in gymdirectory so it is never overwritten by Winter.Blog plugin updates).

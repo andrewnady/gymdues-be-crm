@@ -131,3 +131,11 @@
 1.0.45:
     - 'Add owner_response and owner_responded_at to reviews for gym owner reply feature'
     - add_owner_response_to_reviews.php
+    - 'Add data_state, data_type to downloads (state or type page context; full when both null)'
+    - update_gymsdata_downloads_add_data_scope_columns.php
+1.0.46:
+    - 'Add data_city to downloads (city page: state + city)'
+    - update_gymsdata_downloads_add_data_city.php
+1.0.47:
+    - 'Create winter_blog_comments table if missing for comments API'
+    - create_winter_blog_comments_table_if_missing.php
