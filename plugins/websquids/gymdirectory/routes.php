@@ -7,6 +7,7 @@ use Websquids\Gymdirectory\Controllers\Api\GymClaimsController;
 use Websquids\Gymdirectory\Controllers\Api\GymDisputesController;
 use Websquids\Gymdirectory\Controllers\Api\GymOwnerAuthController;
 use Websquids\Gymdirectory\Controllers\Api\GymOwnerDashboardController;
+use Websquids\Gymdirectory\Controllers\Api\GymOwnerProfileController;
 use websquids\Gymdirectory\Classes\GymOwnerAuthMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
@@ -116,5 +117,25 @@ Route::prefix('api/v1')
         Route::post('gym-owner/auth/logout', [GymOwnerAuthController::class, 'logout']);
 
         Route::get('gym-owner/dashboard', [GymOwnerDashboardController::class, 'index']);
+
+        // Gym owner profile — gym-level
+        Route::get('gym-owner/locations', [GymOwnerProfileController::class, 'getLocations']);
+        Route::get('gym-owner/profile/description', [GymOwnerProfileController::class, 'getDescription']);
+        Route::put('gym-owner/profile/description', [GymOwnerProfileController::class, 'updateDescription']);
+        Route::get('gym-owner/profile/photos', [GymOwnerProfileController::class, 'getPhotos']);
+        Route::post('gym-owner/profile/photos', [GymOwnerProfileController::class, 'uploadPhotos']);
+        Route::delete('gym-owner/profile/photos/{id}', [GymOwnerProfileController::class, 'deletePhoto'])->where('id', '[0-9]+');
+
+        // Gym owner profile — per location (address)
+        Route::get('gym-owner/locations/{address_id}/pricing', [GymOwnerProfileController::class, 'getPricing'])->where('address_id', '[0-9]+');
+        Route::post('gym-owner/locations/{address_id}/pricing', [GymOwnerProfileController::class, 'addPricing'])->where('address_id', '[0-9]+');
+        Route::put('gym-owner/locations/{address_id}/pricing/{plan_id}', [GymOwnerProfileController::class, 'updatePricing'])->where(['address_id' => '[0-9]+', 'plan_id' => '[0-9]+']);
+        Route::delete('gym-owner/locations/{address_id}/pricing/{plan_id}', [GymOwnerProfileController::class, 'deletePricing'])->where(['address_id' => '[0-9]+', 'plan_id' => '[0-9]+']);
+        Route::get('gym-owner/locations/{address_id}/hours', [GymOwnerProfileController::class, 'getHours'])->where('address_id', '[0-9]+');
+        Route::put('gym-owner/locations/{address_id}/hours', [GymOwnerProfileController::class, 'updateHours'])->where('address_id', '[0-9]+');
+        Route::get('gym-owner/locations/{address_id}/reviews', [GymOwnerProfileController::class, 'getReviews'])->where('address_id', '[0-9]+');
+
+        // Review response (not location-scoped — the review ID is globally unique)
+        Route::post('gym-owner/reviews/{id}/respond', [GymOwnerProfileController::class, 'respondToReview'])->where('id', '[0-9]+');
     });
   });

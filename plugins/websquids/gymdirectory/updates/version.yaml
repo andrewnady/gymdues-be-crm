@@ -128,3 +128,6 @@
 1.0.44:
     - 'Create gym_owner_tokens table for magic login and session bearer tokens'
     - create_gym_owner_tokens_table.php
+1.0.45:
+    - 'Add owner_response and owner_responded_at to reviews for gym owner reply feature'
+    - add_owner_response_to_reviews.php
