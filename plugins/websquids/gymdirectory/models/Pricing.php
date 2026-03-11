@@ -26,6 +26,14 @@ class Pricing extends Model {
      */
     public $rules = [];
 
+    protected $fillable = [
+        'address_id',
+        'tier_name',
+        'price',
+        'frequency',
+        'description',
+    ];
+
     /**
      * @var array Attributes to hide from array/JSON (avoids circular ref in API)
      */

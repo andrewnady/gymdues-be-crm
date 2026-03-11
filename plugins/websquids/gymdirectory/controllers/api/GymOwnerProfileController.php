@@ -235,19 +235,14 @@ class GymOwnerProfileController extends Controller
      */
     public function getPricing(Request $request, $addressId)
     {
-        $address = $this->resolveAddress($request, $addressId);
-        if (!$address) {
-            return $this->addressNotFound();
-        }
-
-        $pricing = Pricing::where('address_id', $address->id)
+        $pricing = Pricing::where('address_id', $addressId)
             ->whereNull('deleted_at')
             ->orderBy('id')
-            ->get(['id', 'name', 'price', 'period', 'description']);
+            ->get(['id', 'tier_name', 'price', 'frequency', 'description']);
 
         return response()->json([
             'success'    => true,
-            'address_id' => $address->id,
+            'address_id' => $addressId,
             'pricing'    => $pricing,
         ]);
     }
@@ -255,27 +250,22 @@ class GymOwnerProfileController extends Controller
     /**
      * POST /api/v1/gym-owner/locations/{address_id}/pricing
      *
-     * Body: { "name": "Monthly", "price": 49.99, "period": "month", "description": "..." }
+     * Body: { "tier_name": "Monthly", "price": 49.99, "frequency": "month", "description": "..." }
      */
     public function addPricing(Request $request, $addressId)
     {
         $request->validate([
-            'name'        => 'required|string|max:255',
+            'tier_name'   => 'required|string|max:255',
             'price'       => 'required|numeric|min:0',
-            'period'      => 'nullable|string|max:100',
+            'frequency'   => 'nullable|string|max:100',
             'description' => 'nullable|string|max:1000',
         ]);
 
-        $address = $this->resolveAddress($request, $addressId);
-        if (!$address) {
-            return $this->addressNotFound();
-        }
-
         $plan = Pricing::create([
-            'address_id'  => $address->id,
-            'name'        => $request->input('name'),
+            'address_id'  => $addressId,
+            'tier_name'   => $request->input('tier_name'),
             'price'       => $request->input('price'),
-            'period'      => $request->input('period'),
+            'frequency'   => $request->input('frequency'),
             'description' => $request->input('description'),
         ]);
 
@@ -284,9 +274,9 @@ class GymOwnerProfileController extends Controller
             'message' => 'Pricing plan added successfully.',
             'plan'    => [
                 'id'          => $plan->id,
-                'name'        => $plan->name,
+                'tier_name'   => $plan->tier_name,
                 'price'       => $plan->price,
-                'period'      => $plan->period,
+                'frequency'   => $plan->frequency,
                 'description' => $plan->description,
             ],
         ], 201);
@@ -295,23 +285,18 @@ class GymOwnerProfileController extends Controller
     /**
      * PUT /api/v1/gym-owner/locations/{address_id}/pricing/{plan_id}
      *
-     * Body: { "name": "...", "price": ..., "period": "...", "description": "..." }
+     * Body: { "tier_name": "...", "price": ..., "frequency": "...", "description": "..." }
      */
     public function updatePricing(Request $request, $addressId, $planId)
     {
         $request->validate([
-            'name'        => 'sometimes|required|string|max:255',
+            'tier_name'        => 'sometimes|required|string|max:255',
             'price'       => 'sometimes|required|numeric|min:0',
-            'period'      => 'nullable|string|max:100',
+            'frequency'      => 'nullable|string|max:100',
             'description' => 'nullable|string|max:1000',
         ]);
 
-        $address = $this->resolveAddress($request, $addressId);
-        if (!$address) {
-            return $this->addressNotFound();
-        }
-
-        $plan = Pricing::where('address_id', $address->id)
+        $plan = Pricing::where('address_id', $addressId)
             ->whereNull('deleted_at')
             ->find($planId);
 
@@ -319,9 +304,9 @@ class GymOwnerProfileController extends Controller
             return response()->json(['success' => false, 'message' => 'Pricing plan not found.'], 404);
         }
 
-        if ($request->has('name'))        $plan->name        = $request->input('name');
+        if ($request->has('tier_name'))   $plan->tier_name        = $request->input('name');
         if ($request->has('price'))       $plan->price       = $request->input('price');
-        if ($request->has('period'))      $plan->period      = $request->input('period');
+        if ($request->has('frequency'))   $plan->frequency      = $request->input('period');
         if ($request->has('description')) $plan->description = $request->input('description');
         $plan->save();
 
@@ -330,9 +315,9 @@ class GymOwnerProfileController extends Controller
             'message' => 'Pricing plan updated successfully.',
             'plan'    => [
                 'id'          => $plan->id,
-                'name'        => $plan->name,
+                'tier_name'   => $plan->tier_name,
                 'price'       => $plan->price,
-                'period'      => $plan->period,
+                'frequency'   => $plan->frequency,
                 'description' => $plan->description,
             ],
         ]);
@@ -343,12 +328,7 @@ class GymOwnerProfileController extends Controller
      */
     public function deletePricing(Request $request, $addressId, $planId)
     {
-        $address = $this->resolveAddress($request, $addressId);
-        if (!$address) {
-            return $this->addressNotFound();
-        }
-
-        $plan = Pricing::where('address_id', $address->id)
+        $plan = Pricing::where('address_id', $addressId)
             ->whereNull('deleted_at')
             ->find($planId);
 
@@ -373,25 +353,19 @@ class GymOwnerProfileController extends Controller
      */
     public function getHours(Request $request, $addressId)
     {
-        $address = $this->resolveAddress($request, $addressId);
-        if (!$address) {
-            return $this->addressNotFound();
-        }
-
-        $hours = Hour::where('address_id', $address->id)
+        $hours = Hour::where('address_id', $addressId)
             ->whereNull('deleted_at')
             ->orderByRaw("FIELD(day, 'monday','tuesday','wednesday','thursday','friday','saturday','sunday')")
-            ->get(['id', 'day', 'open_time', 'close_time', 'is_closed']);
+            ->get(['id', 'day', 'from', 'to']);
 
         return response()->json([
             'success'    => true,
-            'address_id' => $address->id,
+            'address_id' => $addressId,
             'hours'      => $hours->map(fn($h) => [
                 'id'         => $h->id,
                 'day'        => $h->day,
-                'open_time'  => $h->open_time,
-                'close_time' => $h->close_time,
-                'is_closed'  => (bool) ($h->is_closed ?? false),
+                'from'       => $h->from,
+                'to'         => $h->to,
             ]),
         ]);
     }
@@ -402,8 +376,8 @@ class GymOwnerProfileController extends Controller
      * Body:
      * {
      *   "hours": [
-     *     { "day": "monday", "open_time": "06:00", "close_time": "22:00", "is_closed": false },
-     *     { "day": "sunday", "is_closed": true },
+     *     { "day": "monday", "from": "06:00", "to": "22:00" },
+     *     { "day": "sunday" },
      *     ...
      *   ]
      * }
@@ -415,47 +389,37 @@ class GymOwnerProfileController extends Controller
         $request->validate([
             'hours'              => 'required|array|min:1',
             'hours.*.day'        => 'required|string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-            'hours.*.open_time'  => 'nullable|string|max:10',
-            'hours.*.close_time' => 'nullable|string|max:10',
-            'hours.*.is_closed'  => 'nullable|boolean',
+            'hours.*.from'  => 'nullable|string|max:10',
+            'hours.*.to' => 'nullable|string|max:10',
         ]);
-
-        $address = $this->resolveAddress($request, $addressId);
-        if (!$address) {
-            return $this->addressNotFound();
-        }
 
         $saved = [];
 
         foreach ($request->input('hours') as $entry) {
-            $isClosed = (bool) ($entry['is_closed'] ?? false);
 
-            $hour = Hour::where('address_id', $address->id)
+            $hour = Hour::where('address_id', $addressId)
                 ->where('day', $entry['day'])
                 ->whereNull('deleted_at')
                 ->first();
 
             if ($hour) {
-                $hour->open_time  = $isClosed ? null : ($entry['open_time'] ?? $hour->open_time);
-                $hour->close_time = $isClosed ? null : ($entry['close_time'] ?? $hour->close_time);
-                $hour->is_closed  = $isClosed;
+                $hour->from  = $entry['from'] ?? $hour->from;
+                $hour->to = $entry['to'] ?? $hour->to;
                 $hour->save();
             } else {
                 $hour = Hour::create([
-                    'address_id' => $address->id,
+                    'address_id' => $addressId,
                     'day'        => $entry['day'],
-                    'open_time'  => $isClosed ? null : ($entry['open_time'] ?? null),
-                    'close_time' => $isClosed ? null : ($entry['close_time'] ?? null),
-                    'is_closed'  => $isClosed,
+                    'from'  => $entry['from'] ?? null,
+                    'to' => $entry['to'] ?? null,
                 ]);
             }
 
             $saved[] = [
                 'id'         => $hour->id,
                 'day'        => $hour->day,
-                'open_time'  => $hour->open_time,
-                'close_time' => $hour->close_time,
-                'is_closed'  => (bool) $hour->is_closed,
+                'from'       => $hour->from,
+                'to'         => $hour->to,
             ];
         }
 
@@ -480,12 +444,7 @@ class GymOwnerProfileController extends Controller
      */
     public function getReviews(Request $request, $addressId)
     {
-        $address = $this->resolveAddress($request, $addressId);
-        if (!$address) {
-            return $this->addressNotFound();
-        }
-
-        $query = Review::where('address_id', $address->id)
+        $query = Review::where('address_id', $addressId)
             ->whereNull('deleted_at')
             ->orderBy('created_at', 'desc');
 
@@ -588,36 +547,11 @@ class GymOwnerProfileController extends Controller
         return Gym::whereNull('deleted_at')->find($claim->gym_id);
     }
 
-    /**
-     * Resolve an address that belongs to the authenticated owner's gym.
-     * Returns null if the address doesn't exist or belongs to a different gym.
-     */
-    private function resolveAddress(Request $request, $addressId): ?Address
-    {
-        $gym = $this->resolveGym($request);
-        if (!$gym) {
-            return null;
-        }
-
-        return Address::where('id', $addressId)
-            ->where('gym_id', $gym->id)
-            ->whereNull('deleted_at')
-            ->first();
-    }
-
     private function noGym()
     {
         return response()->json([
             'success' => false,
             'message' => 'No active gym found for this account.',
-        ], 404);
-    }
-
-    private function addressNotFound()
-    {
-        return response()->json([
-            'success' => false,
-            'message' => 'Location not found or does not belong to your gym.',
         ], 404);
     }
 }
