@@ -10,6 +10,7 @@ use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\GymClaimRequest;
 use websquids\Gymdirectory\Models\GymClaimDispute;
 use websquids\Gymdirectory\Classes\GymOwnerService;
+use Winter\User\Models\User;
 
 /**
  * GymDisputesController
@@ -229,11 +230,25 @@ class GymDisputesController extends Controller
         $gym           = Gym::findOrFail($dispute->gym_id);
         $originalClaim = GymClaimRequest::whereNull('deleted_at')->find($dispute->existing_claim_id);
 
-        // 1. Revoke the original claim
+        // 1. Revoke the original claim and soft-delete the old owner's user account
         if ($originalClaim) {
             $originalClaim->status = GymClaimRequest::STATUS_REJECTED;
             $originalClaim->save();
             $originalClaim->delete(); // soft-delete
+
+            if ($originalClaim->user_id) {
+                $oldOwner = User::find($originalClaim->user_id);
+                if ($oldOwner) {
+                    $oldOwner->is_activated = false;
+                    $oldOwner->save();
+                    $oldOwner->delete(); // soft-delete
+                    Log::info("GymDisputesController@approve: Soft-deleted old owner user #{$oldOwner->id} ({$oldOwner->email})");
+                } else {
+                    Log::warning("GymDisputesController@approve: Original claim has user_id={$originalClaim->user_id} but user not found.");
+                }
+            } else {
+                Log::warning("GymDisputesController@approve: Original claim #{$originalClaim->id} has no linked user_id — skipping user soft-delete.");
+            }
         }
 
         // 2. Create new approved claim for the disputer
@@ -259,6 +274,14 @@ class GymDisputesController extends Controller
         $gymOwnerService = new GymOwnerService();
         $magicToken      = $gymOwnerService->provisionAndGenerateMagicToken($newClaim);
         $dashboardUrl    = $gymOwnerService->buildMagicLoginUrl($magicToken);
+
+        // Verify disputer user account was actually created/linked
+        $newClaim->refresh();
+        if (!$newClaim->user_id || !User::find($newClaim->user_id)) {
+            Log::error("GymDisputesController@approve: Disputer user account not found after provisioning for claim #{$newClaim->id}.");
+        } else {
+            Log::info("GymDisputesController@approve: Disputer user #{$newClaim->user_id} confirmed for claim #{$newClaim->id}.");
+        }
 
         // 5. Send notifications
         $this->dispatchDisputeApprovedEmail($dispute, $gym, $dashboardUrl);
