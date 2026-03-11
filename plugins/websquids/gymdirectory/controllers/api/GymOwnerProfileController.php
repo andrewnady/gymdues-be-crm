@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\Address;
 use websquids\Gymdirectory\Models\GymClaimRequest;
+use websquids\Gymdirectory\Models\GymTeamMember;
 use websquids\Gymdirectory\Models\Pricing;
 use websquids\Gymdirectory\Models\Hour;
 use websquids\Gymdirectory\Models\Review;
@@ -537,17 +538,29 @@ class GymOwnerProfileController extends Controller
     {
         $userId = $request->input('gym_owner_user_id');
 
+        // Owner path — user has an approved claim
         $claim = GymClaimRequest::where('user_id', $userId)
             ->where('status', GymClaimRequest::STATUS_APPROVED)
             ->whereNull('deleted_at')
             ->latest()
             ->first();
 
-        if (!$claim) {
-            return null;
+        if ($claim) {
+            return Gym::whereNull('deleted_at')->find($claim->gym_id);
         }
 
-        return Gym::whereNull('deleted_at')->find($claim->gym_id);
+        // Team member path — user was invited by the owner
+        $membership = GymTeamMember::where('user_id', $userId)
+            ->where('status', GymTeamMember::STATUS_ACCEPTED)
+            ->whereNull('deleted_at')
+            ->latest()
+            ->first();
+
+        if ($membership) {
+            return Gym::whereNull('deleted_at')->find($membership->gym_id);
+        }
+
+        return null;
     }
 
     private function noGym()

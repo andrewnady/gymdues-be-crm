@@ -143,3 +143,6 @@
     - create_winter_blog_comments_table_if_missing.php
     - 'Create gym_claim_disputes table for the Claim Dispute feature'
     - create_gym_claim_disputes_table.php
+1.0.48:
+    - 'Create gym_team_members table for the Invite Team Members feature'
+    - create_gym_team_members_table.php

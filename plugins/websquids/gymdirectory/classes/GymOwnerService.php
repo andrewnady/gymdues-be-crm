@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Winter\User\Models\User;
 use websquids\Gymdirectory\Models\GymClaimRequest;
 use websquids\Gymdirectory\Models\GymOwnerToken;
+use websquids\Gymdirectory\Models\GymTeamMember;
 
 /**
  * GymOwnerService
@@ -71,6 +72,79 @@ class GymOwnerService
         ]);
 
         return $rawToken;
+    }
+
+    /**
+     * Provision a user account for an invited team member and generate a
+     * one-time magic login token to embed in the invitation email.
+     *
+     * Unlike provisionAndGenerateMagicToken(), this method does NOT require a
+     * GymClaimRequest — the invited user gets access via GymTeamMember instead.
+     *
+     * @param  GymTeamMember $member  The pending team member record.
+     * @return string                 Raw (un-hashed) magic token.
+     */
+    public function provisionAndGenerateMagicTokenForMember(GymTeamMember $member): string
+    {
+        // ------------------------------------------------------------------
+        // 1. Find or create the Winter.User for the invited email
+        // ------------------------------------------------------------------
+        $user = User::where('email', $member->email)->first();
+
+        if (!$user) {
+            $password = Str::random(32);
+
+            $user = new User();
+            $user->name     = $member->name ?: $member->email;
+            $user->email    = $member->email;
+            $user->username = $member->email;
+            $user->password = $password;
+            $user->password_confirmation = $password;
+            $user->is_activated  = true;
+            $user->activated_at  = now();
+            $user->forceSave();
+
+            Log::info("GymOwnerService: Created new user #{$user->id} for invited member {$member->email}");
+        } else {
+            Log::info("GymOwnerService: Found existing user #{$user->id} for invited member {$member->email}");
+        }
+
+        // ------------------------------------------------------------------
+        // 2. Store user_id on the team member so acceptance can be confirmed
+        // ------------------------------------------------------------------
+        $member->user_id = $user->id;
+        $member->save();
+
+        // ------------------------------------------------------------------
+        // 3. Generate a one-time magic login token (stored hashed)
+        // ------------------------------------------------------------------
+        $rawToken = Str::random(64);
+
+        GymOwnerToken::create([
+            'user_id'    => $user->id,
+            'token'      => hash('sha256', $rawToken),
+            'type'       => GymOwnerToken::TYPE_MAGIC,
+            'expires_at' => now()->addHours(72),
+            'created_at' => now(),
+        ]);
+
+        return $rawToken;
+    }
+
+    /**
+     * Build the full invitation acceptance URL for the team member email.
+     *
+     * The frontend calls POST /api/v1/gym-owner/team/accept-invite with the
+     * token to exchange it for a session bearer token.
+     *
+     * @param  string $rawToken
+     * @return string
+     */
+    public function buildTeamInviteUrl(string $rawToken): string
+    {
+        $base = rtrim(env('FRONTEND_URL', env('APP_URL', 'https://gymdues.com')), '/');
+
+        return $base . '/dashboard/auth/accept-invite?token=' . urlencode($rawToken);
     }
 
     /**

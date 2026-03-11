@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Winter\User\Models\User;
 use websquids\Gymdirectory\Models\GymOwnerToken;
 use websquids\Gymdirectory\Models\GymClaimRequest;
+use websquids\Gymdirectory\Models\GymTeamMember;
 
 /**
  * GymOwnerAuthController
@@ -164,19 +165,22 @@ class GymOwnerAuthController extends Controller
             return $invalidCredentials;
         }
 
-        // Only gym owners with an active approved claim may log in here
-        $claim = $this->getApprovedClaim($user->id);
+        // Gym owners with an approved claim, or accepted team members, may log in
+        $claim      = $this->getApprovedClaim($user->id);
+        $membership = !$claim ? $this->getAcceptedMembership($user->id) : null;
 
-        if (!$claim) {
+        if (!$claim && !$membership) {
             return response()->json([
                 'success' => false,
-                'message' => 'No approved gym claim found for this account.',
+                'message' => 'No approved gym access found for this account.',
             ], 403);
         }
 
         $rawSession = $this->createSessionToken($user->id);
 
         Log::info("GymOwnerAuthController@login: user #{$user->id} ({$user->email}) logged in via email/password.");
+
+        $gymSource = $claim ?? $membership;
 
         return response()->json([
             'success'      => true,
@@ -189,9 +193,9 @@ class GymOwnerAuthController extends Controller
                 'email' => $user->email,
             ],
             'gym' => [
-                'id'   => $claim->gym_id,
-                'name' => $claim->gym->name ?? null,
-                'slug' => $claim->gym->slug ?? null,
+                'id'   => $gymSource->gym_id,
+                'name' => $gymSource->gym->name ?? null,
+                'slug' => $gymSource->gym->slug ?? null,
             ],
         ]);
     }
@@ -202,9 +206,12 @@ class GymOwnerAuthController extends Controller
      */
     public function me(Request $request)
     {
-        $userId = $request->input('gym_owner_user_id');
-        $user   = User::find($userId);
-        $claim  = $this->getApprovedClaim($userId);
+        $userId    = $request->input('gym_owner_user_id');
+        $user      = User::find($userId);
+        $claim      = $this->getApprovedClaim($userId);
+        $membership = !$claim ? $this->getAcceptedMembership($userId) : null;
+
+        $gymSource = $claim ?? $membership;
 
         return response()->json([
             'success' => true,
@@ -213,10 +220,10 @@ class GymOwnerAuthController extends Controller
                 'name'  => $user->name,
                 'email' => $user->email,
             ],
-            'gym' => $claim ? [
-                'id'   => $claim->gym_id,
-                'name' => $claim->gym->name ?? null,
-                'slug' => $claim->gym->slug ?? null,
+            'gym' => $gymSource ? [
+                'id'   => $gymSource->gym_id,
+                'name' => $gymSource->gym->name ?? null,
+                'slug' => $gymSource->gym->slug ?? null,
             ] : null,
         ]);
     }
@@ -382,6 +389,16 @@ class GymOwnerAuthController extends Controller
     {
         return GymClaimRequest::where('user_id', $userId)
             ->where('status', GymClaimRequest::STATUS_APPROVED)
+            ->whereNull('deleted_at')
+            ->with('gym')
+            ->latest()
+            ->first();
+    }
+
+    private function getAcceptedMembership(int $userId): ?GymTeamMember
+    {
+        return GymTeamMember::where('user_id', $userId)
+            ->where('status', GymTeamMember::STATUS_ACCEPTED)
             ->whereNull('deleted_at')
             ->with('gym')
             ->latest()

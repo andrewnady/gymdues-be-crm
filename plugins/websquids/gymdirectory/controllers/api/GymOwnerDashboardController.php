@@ -6,6 +6,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Winter\User\Models\User;
 use websquids\Gymdirectory\Models\GymClaimRequest;
+use websquids\Gymdirectory\Models\GymTeamMember;
 use websquids\Gymdirectory\Models\Address;
 use websquids\Gymdirectory\Models\Review;
 
@@ -34,7 +35,7 @@ class GymOwnerDashboardController extends Controller
 
         $user = User::find($userId);
 
-        // The most recent approved claim for this user
+        // Owner path — user has an approved claim
         $claim = GymClaimRequest::where('user_id', $userId)
             ->where('status', GymClaimRequest::STATUS_APPROVED)
             ->whereNull('deleted_at')
@@ -42,14 +43,26 @@ class GymOwnerDashboardController extends Controller
             ->latest()
             ->first();
 
+        // Team member path — fall back to accepted team membership
         if (!$claim || !$claim->gym) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active gym found for this account.',
-            ], 404);
-        }
+            $membership = GymTeamMember::where('user_id', $userId)
+                ->where('status', GymTeamMember::STATUS_ACCEPTED)
+                ->whereNull('deleted_at')
+                ->with('gym')
+                ->latest()
+                ->first();
 
-        $gym = $claim->gym;
+            if (!$membership || !$membership->gym) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No active gym found for this account.',
+                ], 404);
+            }
+
+            $gym = $membership->gym;
+        } else {
+            $gym = $claim->gym;
+        }
 
         // Eager-load all addresses with their sub-relations
         $gym->load([
@@ -81,10 +94,10 @@ class GymOwnerDashboardController extends Controller
                 'id'         => $user->id,
                 'name'       => $user->name,
                 'email'      => $user->email,
-                'job_title'  => $claim->full_name !== $user->name ? $claim->full_name : null,
-                'job_title'  => $claim->job_title,
-                'phone'      => $claim->phone_number,
-                'claimed_at' => $claim->verified_at,
+                'job_title'  => $claim->job_title ?? null,
+                'phone'      => $claim->phone_number ?? null,
+                'claimed_at' => $claim->verified_at ?? null,
+                'role'       => $claim ? 'owner' : ($membership->role ?? 'manager'),
             ],
 
             'gym' => [

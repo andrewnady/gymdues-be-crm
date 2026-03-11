@@ -8,6 +8,7 @@ use Websquids\Gymdirectory\Controllers\Api\GymDisputesController;
 use Websquids\Gymdirectory\Controllers\Api\GymOwnerAuthController;
 use Websquids\Gymdirectory\Controllers\Api\GymOwnerDashboardController;
 use Websquids\Gymdirectory\Controllers\Api\GymOwnerProfileController;
+use Websquids\Gymdirectory\Controllers\Api\GymTeamController;
 use websquids\Gymdirectory\Classes\GymOwnerAuthMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
@@ -103,6 +104,9 @@ Route::prefix('api/v1')
     Route::post('gym-disputes/{id}/approve', [GymDisputesController::class, 'approve'])->where('id', '[0-9]+');
     Route::post('gym-disputes/{id}/reject', [GymDisputesController::class, 'reject'])->where('id', '[0-9]+');
 
+    // Team invitation acceptance (public — uses magic token from invitation email)
+    Route::post('gym-owner/team/accept-invite', [GymTeamController::class, 'acceptInvite']);
+
     // Gym owner authentication
     // Public endpoints
     Route::post('gym-owner/auth/magic-login', [GymOwnerAuthController::class, 'magicLogin']);
@@ -137,5 +141,10 @@ Route::prefix('api/v1')
 
         // Review response (not location-scoped — the review ID is globally unique)
         Route::post('gym-owner/reviews/{id}/respond', [GymOwnerProfileController::class, 'respondToReview'])->where('id', '[0-9]+');
+
+        // Team management (invite/list/revoke — owner only)
+        Route::get('gym-owner/team', [GymTeamController::class, 'index']);
+        Route::post('gym-owner/team/invite', [GymTeamController::class, 'invite']);
+        Route::delete('gym-owner/team/{id}', [GymTeamController::class, 'revoke'])->where('id', '[0-9]+');
     });
   });
