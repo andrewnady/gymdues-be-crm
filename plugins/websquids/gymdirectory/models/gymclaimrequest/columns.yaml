@@ -1,0 +1,38 @@
+columns:
+    id:
+        label: ID
+        type: number
+        searchable: true
+    gym[name]:
+        label: Gym
+        relation: gym
+        select: name
+        searchable: true
+    full_name:
+        label: Full Name
+        type: text
+        searchable: true
+    job_title:
+        label: Job Title
+        type: text
+        searchable: true
+    business_email:
+        label: Business Email
+        type: text
+        searchable: true
+    phone_number:
+        label: Phone
+        type: text
+        searchable: true
+    verification_method:
+        label: Method
+        type: text
+    status:
+        label: Status
+        type: text
+    verified_at:
+        label: Verified At
+        type: datetime
+    created_at:
+        label: Submitted
+        type: datetime

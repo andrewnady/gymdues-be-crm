@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claim Revoked – GymDues</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+        .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header { background: #ef4444; padding: 30px 40px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 22px; }
+        .badge { text-align: center; padding: 30px 0 10px; }
+        .badge .icon { font-size: 56px; }
+        .body { padding: 10px 40px 40px; color: #333333; }
+        .body p { line-height: 1.6; }
+        .body h2 { color: #ef4444; }
+        .info-box { background: #fff5f5; border-left: 4px solid #ef4444; border-radius: 4px; padding: 16px 20px; margin: 20px 0; color: #444; }
+        .footer { background: #f9f9f9; padding: 20px 40px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #eee; }
+        .footer a { color: #10B77F; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <h1>GymDues – Claim Revoked</h1>
+        </div>
+        <div class="badge">
+            <span class="icon">&#9888;&#65039;</span>
+        </div>
+        <div class="body">
+            <h2>Your claim for {{ gymName }} has been revoked</h2>
+            <p>Hi <strong>{{ fullName }}</strong>,</p>
+            <p>Following a review of a dispute filed against the claim for <strong>{{ gymName }}</strong>, our team has determined that the claim was not valid. As a result, your access to this gym's owner dashboard has been revoked effective immediately.</p>
+
+            <div class="info-box">
+                If you believe this decision is incorrect, please <a href="https://gymdues.com/contact" style="color:#ef4444;">contact our support team</a> immediately with documentation proving your ownership of <strong>{{ gymName }}</strong>.
+            </div>
+
+            <p>We take the integrity of our platform seriously and appreciate your understanding.</p>
+            <p>– The GymDues Team</p>
+        </div>
+        <div class="footer">
+            &copy; {{ "now"|date("Y") }} GymDues &nbsp;|&nbsp;
+            <a href="https://gymdues.com">gymdues.com</a>
+        </div>
+    </div>
+</body>
+</html>

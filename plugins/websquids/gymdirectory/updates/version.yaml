@@ -117,8 +117,8 @@
     - 'Updated table websquids_gymdirectory_best_gyms_pages - remove country_id, state_id, city_id; add country column after gyms_data'
     - update_best_gyms_pages_replace_ids_with_country.php
 1.0.41:
-    - 'Create downloads table in PostgreSQL gymsdata DB (for sample download & purchase leads)'
-    - create_gymsdata_sample_downloads_table.php
+    - 'Create gym_claim_requests table for the Claim Your Gym feature'
+    - create_gym_claim_requests_table.php
 1.0.42:
     - 'Add type and amount columns to downloads (sample vs purchase)'
     - update_gymsdata_sample_downloads_add_type_and_amount.php
@@ -137,3 +137,5 @@
 1.0.47:
     - 'Create winter_blog_comments table if missing for comments API'
     - create_winter_blog_comments_table_if_missing.php
+    - 'Create gym_claim_disputes table for the Claim Dispute feature'
+    - create_gym_claim_disputes_table.php
