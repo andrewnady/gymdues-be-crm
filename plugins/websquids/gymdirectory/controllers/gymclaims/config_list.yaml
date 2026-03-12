@@ -1,0 +1,34 @@
+title: Gym Claims
+modelClass: websquids\Gymdirectory\Models\GymClaimRequest
+list: $/websquids/gymdirectory/models/gymclaimrequest/columns.yaml
+recordUrl: 'websquids/gymdirectory/gymclaims/update/:id'
+noRecordsMessage: 'backend::lang.list.no_records'
+recordsPerPage: 20
+showSetup: true
+showCheckboxes: false
+defaultSort:
+    column: created_at
+    direction: desc
+toolbar:
+    search:
+        prompt: 'Search by name, email, phone...'
+filter:
+    scopes:
+        status:
+            label: Status
+            type: group
+            conditions: "status = ':filtered'"
+            options:
+                pending: Pending
+                code_sent: Code Sent
+                document_uploaded: Document Uploaded
+                approved: Approved
+                rejected: Rejected
+        verification_method:
+            label: Verification Method
+            type: group
+            conditions: "verification_method = ':filtered'"
+            options:
+                email_domain: Email Domain
+                phone_sms: Phone SMS
+                document: Document
