@@ -1,0 +1,26 @@
+title: Gym Claim Disputes
+modelClass: websquids\Gymdirectory\Models\GymClaimDispute
+list: $/websquids/gymdirectory/models/gymclaimpispute/columns.yaml
+recordUrl: 'websquids/gymdirectory/gymclaimdisputes/update/:id'
+noRecordsMessage: 'backend::lang.list.no_records'
+recordsPerPage: 20
+showSetup: true
+showCheckboxes: true
+defaultSort:
+    column: created_at
+    direction: desc
+toolbar:
+    buttons: list_toolbar
+    search:
+        prompt: 'Search by name, email...'
+filter:
+    scopes:
+        status:
+            label: Status
+            type: group
+            conditions: "status = ':filtered'"
+            options:
+                pending: Pending
+                under_review: Under Review
+                approved: Approved
+                rejected: Rejected

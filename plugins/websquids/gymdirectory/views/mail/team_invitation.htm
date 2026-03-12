@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You've Been Invited to Manage a Gym – GymDues</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+        .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header { background: #10B77F; padding: 30px 40px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 22px; }
+        .badge { text-align: center; padding: 30px 0 10px; }
+        .badge .icon { font-size: 56px; }
+        .body { padding: 10px 40px 40px; color: #333333; }
+        .body p { line-height: 1.6; }
+        .body h2 { color: #10B77F; }
+        .cta { text-align: center; margin: 30px 0; }
+        .btn { display: inline-block; background: #10B77F; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-size: 16px; font-weight: bold; }
+        .info-box { background: #f0fff8; border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+        .info-box h3 { margin-top: 0; color: #10B77F; }
+        .info-box ul { margin: 0; padding-left: 18px; color: #444; line-height: 1.8; }
+        .note { font-size: 13px; color: #888; text-align: center; }
+        .footer { background: #f9f9f9; padding: 20px 40px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #eee; }
+        .footer a { color: #10B77F; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <h1>GymDues – Team Invitation</h1>
+        </div>
+        <div class="badge">
+            <span class="icon">&#128101;</span>
+        </div>
+        <div class="body">
+            <h2>You've been invited to manage {{ gymName }}!</h2>
+            <p>Hi <strong>{{ inviteeName }}</strong>,</p>
+            <p><strong>{{ inviterName }}</strong> has invited you to help manage the gym listing for <strong>{{ gymName }}</strong> on GymDues.</p>
+            <p>As a team member, you'll be able to:</p>
+
+            <div class="info-box">
+                <ul>
+                    <li>Update the gym's description and photos</li>
+                    <li>Manage membership pricing and plans</li>
+                    <li>Set and update operating hours</li>
+                    <li>Respond to member reviews</li>
+                    <li>View dashboard analytics</li>
+                </ul>
+            </div>
+
+            <p>Click the button below to accept your invitation and access the dashboard. This link is valid for <strong>72 hours</strong>.</p>
+
+            <div class="cta">
+                <a href="{{ inviteUrl }}" class="btn">Accept Invitation</a>
+            </div>
+
+            <p class="note">If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="{{ inviteUrl }}" style="color:#10B77F; word-break: break-all;">{{ inviteUrl }}</a>
+            </p>
+
+            <p>If you weren't expecting this invitation or don't recognize <strong>{{ gymName }}</strong>, you can safely ignore this email.</p>
+
+            <p>Welcome to the team,<br>– The GymDues Team</p>
+        </div>
+        <div class="footer">
+            &copy; {{ "now"|date("Y") }} GymDues &nbsp;|&nbsp;
+            <a href="https://gymdues.com">gymdues.com</a>
+        </div>
+    </div>
+</body>
+</html>

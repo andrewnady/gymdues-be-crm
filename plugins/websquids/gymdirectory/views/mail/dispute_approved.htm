@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispute Approved – GymDues</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+        .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header { background: #10B77F; padding: 30px 40px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 22px; }
+        .badge { text-align: center; padding: 30px 0 10px; }
+        .badge .icon { font-size: 56px; }
+        .body { padding: 10px 40px 40px; color: #333333; }
+        .body p { line-height: 1.6; }
+        .body h2 { color: #10B77F; }
+        .cta { text-align: center; margin: 30px 0; }
+        .btn { display: inline-block; background: #10B77F; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-size: 16px; font-weight: bold; }
+        .steps { background: #f0fff8; border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+        .steps h3 { margin-top: 0; color: #10B77F; }
+        .steps ol { margin: 0; padding-left: 18px; color: #444; line-height: 1.8; }
+        .footer { background: #f9f9f9; padding: 20px 40px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #eee; }
+        .footer a { color: #10B77F; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <h1>GymDues – Dispute Approved</h1>
+        </div>
+        <div class="badge">
+            <span class="icon">&#127942;</span>
+        </div>
+        <div class="body">
+            <h2>You are now the verified owner of {{ gymName }}!</h2>
+            <p>Hi <strong>{{ fullName }}</strong>,</p>
+            <p>Great news! After reviewing your submitted documents, our team has verified your ownership of <strong>{{ gymName }}</strong>. The previous claim has been revoked and your business dashboard is now active on GymDues.</p>
+
+            <div class="steps">
+                <h3>Quick-Start Guide</h3>
+                <ol>
+                    <li>Log in to your <strong>Owner Dashboard</strong></li>
+                    <li>Complete your gym profile (photos, description, amenities)</li>
+                    <li>Set your pricing &amp; membership tiers</li>
+                    <li>Respond to member reviews</li>
+                    <li>Monitor your listing analytics</li>
+                </ol>
+            </div>
+
+            <div class="cta">
+                <a href="{{ dashboardUrl }}" class="btn">Go to My Dashboard</a>
+            </div>
+
+            <p>If you have any questions, reply to this email or visit our <a href="https://gymdues.com/contact" style="color:#10B77F;">support page</a>.</p>
+            <p>Welcome aboard,<br>– The GymDues Team</p>
+        </div>
+        <div class="footer">
+            &copy; {{ "now"|date("Y") }} GymDues &nbsp;|&nbsp;
+            <a href="https://gymdues.com">gymdues.com</a>
+        </div>
+    </div>
+</body>
+</html>

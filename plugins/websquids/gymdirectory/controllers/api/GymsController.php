@@ -612,6 +612,7 @@ class GymsController extends Controller {
         'logo',
         'gallery',
         'featured_image',
+        'approvedClaim',
       ])
         ->where('slug', $slug)
         ->firstOrFail();
@@ -642,6 +643,41 @@ class GymsController extends Controller {
       $gym->addresses_count = $gym->addresses()->count();
       $gym->contacts_count = $gym->contacts()->count();
       $gym->contacts = $gym->contacts;
+      // approvedClaim is already eager-loaded; is_claimed uses it without a second query
+      $gym->is_claimed = $gym->is_claimed;
+
+      // ------------------------------------------------------------------
+      // Profile completeness checklist (drives the GymDues Verified badge)
+      // All 5 items must be true for is_verified to be true.
+      // ------------------------------------------------------------------
+      $checklist = [
+        // 1. Gym has a non-empty description
+        'has_description'     => !empty(trim($gym->description ?? '')),
+
+        // 2. At least one pricing/membership plan set (already loaded above)
+        'has_pricing'         => $gym->pricing instanceof \Illuminate\Support\Collection
+                                   ? $gym->pricing->isNotEmpty()
+                                   : !empty($gym->pricing),
+
+        // 3. At least one gallery photo OR a featured image uploaded
+        'has_photos'          => ($gym->gallery && $gym->gallery->count() > 0)
+                                   || $gym->featured_image !== null,
+
+        // 4. Operating hours set for at least one day (already loaded above)
+        'has_hours'           => $gym->hours instanceof \Illuminate\Support\Collection
+                                   ? $gym->hours->isNotEmpty()
+                                   : !empty($gym->hours),
+
+        // 5. Owner has replied to at least one review
+        'has_review_response' => $gym->reviews instanceof \Illuminate\Support\Collection
+                                   ? $gym->reviews->contains(fn($r) => !empty($r->owner_response))
+                                   : false,
+      ];
+
+      $gym->profile_checklist = $checklist;
+
+      // is_verified = gym is claimed AND every checklist item is complete
+      $gym->is_verified = $gym->is_claimed && !in_array(false, $checklist, true);
 
       return response()->json($gym->toArray());
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {

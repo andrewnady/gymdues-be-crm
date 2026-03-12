@@ -3,6 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use websquids\Gymdirectory\Classes\ApiKeyMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsController;
+use Websquids\Gymdirectory\Controllers\Api\GymClaimsController;
+use Websquids\Gymdirectory\Controllers\Api\GymDisputesController;
+use Websquids\Gymdirectory\Controllers\Api\GymOwnerAuthController;
+use Websquids\Gymdirectory\Controllers\Api\GymOwnerDashboardController;
+use Websquids\Gymdirectory\Controllers\Api\GymOwnerProfileController;
+use Websquids\Gymdirectory\Controllers\Api\GymTeamController;
+use websquids\Gymdirectory\Classes\GymOwnerAuthMiddleware;
 use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 use Websquids\Gymdirectory\Controllers\Api\ReviewsController;
 use Websquids\Gymdirectory\Controllers\Api\StaticPagesController;
@@ -79,4 +86,65 @@ Route::prefix('api/v1')
     
     // Newsletter subscriptions routes
     Route::post('newsletter-subscriptions', [NewsletterSubscriptionsController::class, 'store']);
+
+    // Gym claim routes
+    Route::post('gym-claims/initiate', [GymClaimsController::class, 'initiate']);
+    Route::get('gym-claims/{id}', [GymClaimsController::class, 'status'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/send-email-code', [GymClaimsController::class, 'sendEmailCode'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/verify-email', [GymClaimsController::class, 'verifyEmail'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/send-phone-code', [GymClaimsController::class, 'sendPhoneCode'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/verify-phone', [GymClaimsController::class, 'verifyPhone'])->where('id', '[0-9]+');
+    Route::post('gym-claims/{id}/upload-document', [GymClaimsController::class, 'uploadDocument'])->where('id', '[0-9]+');
+
+    // Gym dispute routes (filed when gym is already claimed)
+    Route::post('gym-disputes', [GymDisputesController::class, 'initiate']);
+    Route::get('gym-disputes/{id}', [GymDisputesController::class, 'status'])->where('id', '[0-9]+');
+    Route::post('gym-disputes/{id}/upload-document', [GymDisputesController::class, 'uploadDocument'])->where('id', '[0-9]+');
+    // Admin-only dispute resolution
+    Route::post('gym-disputes/{id}/approve', [GymDisputesController::class, 'approve'])->where('id', '[0-9]+');
+    Route::post('gym-disputes/{id}/reject', [GymDisputesController::class, 'reject'])->where('id', '[0-9]+');
+
+    // Team invitation acceptance (public — uses magic token from invitation email)
+    Route::post('gym-owner/team/accept-invite', [GymTeamController::class, 'acceptInvite']);
+
+    // Gym owner authentication
+    // Public endpoints
+    Route::post('gym-owner/auth/magic-login', [GymOwnerAuthController::class, 'magicLogin']);
+    Route::post('gym-owner/auth/login', [GymOwnerAuthController::class, 'login']);
+    Route::post('gym-owner/auth/forgot-password', [GymOwnerAuthController::class, 'forgotPassword']);
+    Route::post('gym-owner/auth/reset-password', [GymOwnerAuthController::class, 'resetPassword']);
+
+    // Protected endpoints (require a valid session bearer token)
+    Route::middleware(GymOwnerAuthMiddleware::class)->group(function () {
+        Route::post('gym-owner/auth/set-password', [GymOwnerAuthController::class, 'setPassword']);
+        Route::get('gym-owner/auth/me', [GymOwnerAuthController::class, 'me']);
+        Route::post('gym-owner/auth/logout', [GymOwnerAuthController::class, 'logout']);
+
+        Route::get('gym-owner/dashboard', [GymOwnerDashboardController::class, 'index']);
+
+        // Gym owner profile — gym-level
+        Route::get('gym-owner/locations', [GymOwnerProfileController::class, 'getLocations']);
+        Route::get('gym-owner/profile/description', [GymOwnerProfileController::class, 'getDescription']);
+        Route::put('gym-owner/profile/description', [GymOwnerProfileController::class, 'updateDescription']);
+        Route::get('gym-owner/profile/photos', [GymOwnerProfileController::class, 'getPhotos']);
+        Route::post('gym-owner/profile/photos', [GymOwnerProfileController::class, 'uploadPhotos']);
+        Route::delete('gym-owner/profile/photos/{id}', [GymOwnerProfileController::class, 'deletePhoto'])->where('id', '[0-9]+');
+
+        // Gym owner profile — per location (address)
+        Route::get('gym-owner/locations/{address_id}/pricing', [GymOwnerProfileController::class, 'getPricing'])->where('address_id', '[0-9]+');
+        Route::post('gym-owner/locations/{address_id}/pricing', [GymOwnerProfileController::class, 'addPricing'])->where('address_id', '[0-9]+');
+        Route::put('gym-owner/locations/{address_id}/pricing/{plan_id}', [GymOwnerProfileController::class, 'updatePricing'])->where(['address_id' => '[0-9]+', 'plan_id' => '[0-9]+']);
+        Route::delete('gym-owner/locations/{address_id}/pricing/{plan_id}', [GymOwnerProfileController::class, 'deletePricing'])->where(['address_id' => '[0-9]+', 'plan_id' => '[0-9]+']);
+        Route::get('gym-owner/locations/{address_id}/hours', [GymOwnerProfileController::class, 'getHours'])->where('address_id', '[0-9]+');
+        Route::put('gym-owner/locations/{address_id}/hours', [GymOwnerProfileController::class, 'updateHours'])->where('address_id', '[0-9]+');
+        Route::get('gym-owner/locations/{address_id}/reviews', [GymOwnerProfileController::class, 'getReviews'])->where('address_id', '[0-9]+');
+
+        // Review response (not location-scoped — the review ID is globally unique)
+        Route::post('gym-owner/reviews/{id}/respond', [GymOwnerProfileController::class, 'respondToReview'])->where('id', '[0-9]+');
+
+        // Team management (invite/list/revoke — owner only)
+        Route::get('gym-owner/team', [GymTeamController::class, 'index']);
+        Route::post('gym-owner/team/invite', [GymTeamController::class, 'invite']);
+        Route::delete('gym-owner/team/{id}', [GymTeamController::class, 'revoke'])->where('id', '[0-9]+');
+    });
   });
