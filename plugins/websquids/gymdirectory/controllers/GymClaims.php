@@ -4,6 +4,7 @@ use Backend\Classes\Controller;
 use BackendMenu;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\GymClaimRequest;
 use websquids\Gymdirectory\Classes\GymOwnerService;
@@ -56,6 +57,35 @@ class GymClaims extends Controller
 
             $this->dispatchApprovalEmail($model, $gym, $dashboardUrl);
         }
+    }
+
+    // =========================================================================
+    // Document download
+    // =========================================================================
+
+    /**
+     * GET /backend/websquids/gymdirectory/gymclaims/download_document/{id}
+     * Streams the uploaded claim document to the browser.
+     */
+    public function download_document($id)
+    {
+        $claim = GymClaimRequest::findOrFail($id);
+
+        if (empty($claim->document_path)) {
+            \Flash::error('No document has been uploaded for this claim.');
+            return redirect()->back();
+        }
+
+        if (!Storage::disk('local')->exists($claim->document_path)) {
+            \Flash::error('Document file not found on disk.');
+            return redirect()->back();
+        }
+
+        $fullPath  = Storage::disk('local')->path($claim->document_path);
+        $filename  = basename($claim->document_path);
+        $mimeType  = mime_content_type($fullPath) ?: 'application/octet-stream';
+
+        return response()->download($fullPath, $filename, ['Content-Type' => $mimeType]);
     }
 
     // =========================================================================

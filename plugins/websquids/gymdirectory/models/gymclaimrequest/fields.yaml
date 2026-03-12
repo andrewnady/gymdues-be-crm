@@ -33,9 +33,9 @@ fields:
             approved: Approved
             rejected: Rejected
     document_path:
-        label: Document Path
-        type: text
-        disabled: true
+        label: Uploaded Document
+        type: partial
+        path: $/websquids/gymdirectory/controllers/gymclaims/_document_download.htm
     ip_address:
         label: IP Address
         type: text
