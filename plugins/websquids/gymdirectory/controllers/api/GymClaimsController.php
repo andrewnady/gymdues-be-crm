@@ -486,6 +486,33 @@ class GymClaimsController extends Controller
     }
 
     /**
+     * Get the gym's primary business_phone contact value.
+     */
+    private function getGymPhone(Gym $gym): ?string
+    {
+        $contact = Contact::where('gym_id', $gym->id)
+            ->where('type', 'business_phone')
+            ->whereNotNull('value')
+            ->first();
+
+        if ($contact) {
+            return $contact->value;
+        }
+
+        $addressIds = $gym->addresses()->pluck('id');
+        if ($addressIds->isNotEmpty()) {
+            $contact = Contact::whereIn('address_id', $addressIds)
+                ->where('type', 'business_phone')
+                ->whereNotNull('value')
+                ->first();
+
+            return $contact?->value;
+        }
+
+        return null;
+    }
+
+    /**
      * Strip scheme and www. to get the bare domain, e.g. "ironworksgym.com".
      */
     private function extractDomain(string $url): ?string
