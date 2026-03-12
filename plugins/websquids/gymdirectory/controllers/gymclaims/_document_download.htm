@@ -1,0 +1,21 @@
+<?php if ($model && $model->document_path): ?>
+    <div class="form-group">
+        <label class="control-label">Uploaded Document</label>
+        <div>
+            <a href="<?= Backend::url('websquids/gymdirectory/gymclaims/download_document/' . $model->id) ?>"
+               class="btn btn-default btn-sm"
+               target="_blank">
+                <i class="icon-download"></i>
+                Download Document
+            </a>
+            <span class="help-block" style="display:inline-block; margin-left:10px;">
+                <?= e(basename($model->document_path)) ?>
+            </span>
+        </div>
+    </div>
+<?php else: ?>
+    <div class="form-group">
+        <label class="control-label">Uploaded Document</label>
+        <div class="text-muted">No document uploaded.</div>
+    </div>
+<?php endif; ?>
