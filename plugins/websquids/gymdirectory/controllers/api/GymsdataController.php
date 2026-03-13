@@ -1862,8 +1862,8 @@ class GymsdataController extends Controller
             Stripe::setApiKey($key);
             // e.g. GYMSDATA_FRONTEND_URL=https://gymsdata.gymdues.com for gymsdata subdomain
             $frontendOrigin = rtrim(env('GYMSDATA_FRONTEND_URL', env('APP_URL', '')), '/');
-            $successUrl = $frontendOrigin . '/gymsdata/checkout/success?session_id={CHECKOUT_SESSION_ID}';
-            $cancelUrl = $frontendOrigin . '/gymsdata/checkout/cancel';
+            $successUrl = $frontendOrigin . '/checkout/success?session_id={CHECKOUT_SESSION_ID}';
+            $cancelUrl = $frontendOrigin . '/checkout/cancel';
             if ($city && $state) {
                 $productName = 'Gyms data: ' . $city . ', ' . $state;
                 $productDescription = 'Gym list for ' . $city . ', ' . $state;
