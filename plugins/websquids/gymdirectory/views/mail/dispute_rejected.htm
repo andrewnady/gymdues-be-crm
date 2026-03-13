@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispute Update – GymDues</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+        .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header { background: #10B77F; padding: 30px 40px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 22px; }
+        .badge { text-align: center; padding: 30px 0 10px; }
+        .badge .icon { font-size: 56px; }
+        .body { padding: 10px 40px 40px; color: #333333; }
+        .body p { line-height: 1.6; }
+        .body h2 { color: #333; }
+        .info-box { background: #fff8f0; border-left: 4px solid #f59e0b; border-radius: 4px; padding: 16px 20px; margin: 20px 0; color: #444; }
+        .footer { background: #f9f9f9; padding: 20px 40px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #eee; }
+        .footer a { color: #10B77F; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <h1>GymDues – Dispute Update</h1>
+        </div>
+        <div class="badge">
+            <span class="icon">&#128203;</span>
+        </div>
+        <div class="body">
+            <h2>Dispute Decision for {{ gymName }}</h2>
+            <p>Hi <strong>{{ fullName }}</strong>,</p>
+            <p>Our team has completed the review of your dispute for <strong>{{ gymName }}</strong>.</p>
+
+            <div class="info-box">
+                After carefully reviewing the submitted documents, we were unable to verify your ownership of <strong>{{ gymName }}</strong> at this time. The existing claim remains active.
+            </div>
+
+            <p>If you believe this decision is incorrect or have additional documentation to support your claim, please <a href="https://gymdues.com/contact" style="color:#10B77F;">contact our support team</a> and we will be happy to review further.</p>
+            <p>– The GymDues Team</p>
+        </div>
+        <div class="footer">
+            &copy; {{ "now"|date("Y") }} GymDues &nbsp;|&nbsp;
+            <a href="https://gymdues.com">gymdues.com</a>
+        </div>
+    </div>
+</body>
+</html>
