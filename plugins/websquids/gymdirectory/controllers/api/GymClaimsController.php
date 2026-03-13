@@ -5,12 +5,13 @@ namespace Websquids\Gymdirectory\Controllers\Api;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\Contact;
 use websquids\Gymdirectory\Models\GymClaimRequest;
-use websquids\Gymdirectory\Services\SmsService;
 use websquids\Gymdirectory\Classes\GymOwnerService;
+use Websquids\Gymdirectory\Jobs\SendClaimVerificationEmailJob;
+use Websquids\Gymdirectory\Jobs\SendClaimApprovalEmailJob;
+use Websquids\Gymdirectory\Jobs\SendClaimPhoneSmsJob;
 
 /**
  * GymClaimsController
@@ -142,7 +143,7 @@ class GymClaimsController extends Controller
         return response()->json([
             'success'           => true,
             'claim_id'          => $claim->id,
-            'available_methods' => $this->getAvailableMethods($validated['business_email'], $gym),
+            'available_methods' => $this->getAvailableMethods($validated['business_email'], $validated['phone_number'], $gym),
             'message'           => 'Claim initiated. Please choose a verification method.',
         ], 201);
     }
@@ -168,14 +169,6 @@ class GymClaimsController extends Controller
         }
 
         $gym = Gym::findOrFail($claim->gym_id);
-
-        // Verify email domain eligibility at send-time
-        if (!$this->emailDomainMatchesGym($claim->business_email, $gym)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your email domain does not match the gym\'s website domain. Please choose another verification method.',
-            ], 422);
-        }
 
         // Update method and send code
         $claim->verification_method = GymClaimRequest::METHOD_EMAIL_DOMAIN;
@@ -255,23 +248,14 @@ class GymClaimsController extends Controller
         }
 
         $gym   = Gym::findOrFail($claim->gym_id);
-        $phone = $request->input('phone_number');
+        // $phone = $request->input('phone_number');
+        $phone = '+18777804236';
 
         // Update method and send code
         $claim->verification_method = GymClaimRequest::METHOD_PHONE_SMS;
         $code = $claim->generateAndSaveCode(); // saves status=code_sent
 
-        try {
-            $sms = new SmsService();
-            $sms->send(
-                $phone,
-                'Your GymDues verification code for ' . $gym->name . ': ' . $code . '. Valid for 10 minutes.'
-            );
-            Log::info('VERIFICATION CODE VIA SMS : ' . $code);
-        } catch (\Exception $e) {
-            Log::error('GymClaimsController@sendPhoneCode SMS error: ' . $e->getMessage());
-            // Code is persisted — user can still enter it once the SMS provider is re-tried
-        }
+        SendClaimPhoneSmsJob::dispatch($phone, $gym->name, $code);
 
         return response()->json([
             'success' => true,
@@ -410,21 +394,26 @@ class GymClaimsController extends Controller
     // =========================================================================
 
     /**
-     * Determine which verification methods are available for the given email + gym.
-     * The frontend uses this list to render the tab set.
+     * Determine which verification methods are available for the given email, phone + gym.
+     * A method is offered only when the claimant's supplied value matches a contact
+     * already on record for this gym.
+     *
+     * email_domain  → typed email matches a business_email contact of the gym
+     * phone_sms     → typed phone matches a business_phone contact of the gym
+     * document      → always available as a fallback
      *
      * @return string[]  e.g. ['email_domain', 'phone_sms', 'document']
      */
-    private function getAvailableMethods(string $email, Gym $gym): array
+    private function getAvailableMethods(string $email, string $phone, Gym $gym): array
     {
         $methods = [];
 
-        if ($this->emailDomainMatchesGym($email, $gym)) {
-            $methods[] = GymClaimRequest::METHOD_EMAIL_DOMAIN;
+        if ($this->emailMatchesGymContacts($email, $gym)) {
+            $methods[] = GymClaimRequest::METHOD_EMAIL_MATCHED;
         }
 
-        if ($this->gymHasPhone($gym)) {
-            $methods[] = GymClaimRequest::METHOD_PHONE_SMS;
+        if ($this->phoneMatchesGymContacts($phone, $gym)) {
+            $methods[] = GymClaimRequest::METHOD_PHONE_MATCHED;
         }
 
         // Document upload is always available as a fallback
@@ -444,132 +433,85 @@ class GymClaimsController extends Controller
     }
 
     /**
-     * True if the claimant's email domain matches any business_website contact for this gym.
+     * True if the typed email exactly matches any business_email contact for this gym
+     * (gym-level or address-level, case-insensitive).
      */
-    private function emailDomainMatchesGym(string $email, Gym $gym): bool
+    private function emailMatchesGymContacts(string $email, Gym $gym): bool
     {
-        $emailDomain = strtolower(ltrim(strrchr($email, '@'), '@'));
+        $email = strtolower(trim($email));
 
-        if (empty($emailDomain)) {
+        if (empty($email)) {
             return false;
         }
 
-        // Gym-level website contacts
-        $websites = Contact::where('gym_id', $gym->id)
-            ->where('type', 'business_website')
+        $emails = Contact::where('gym_id', $gym->id)
+            ->where('type', 'email')
             ->whereNotNull('value')
             ->pluck('value');
 
-        // Address-level website contacts
         $addressIds = $gym->addresses()->pluck('id');
         if ($addressIds->isNotEmpty()) {
-            $websites = $websites->merge(
+            $emails = $emails->merge(
                 Contact::whereIn('address_id', $addressIds)
-                    ->where('type', 'business_website')
+                    ->where('type', 'email')
                     ->whereNotNull('value')
                     ->pluck('value')
             );
         }
 
-        foreach ($websites as $website) {
-            if ($this->extractDomain($website) === $emailDomain) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function gymHasPhone(Gym $gym): bool
-    {
-        return $this->getGymPhone($gym) !== null;
+        return $emails->map(fn($e) => strtolower(trim($e)))->contains($email);
     }
 
     /**
-     * Get the gym's primary business_phone contact value.
+     * True if the typed phone matches any business_phone contact for this gym
+     * (gym-level or address-level). Comparison ignores non-digit characters.
      */
-    private function getGymPhone(Gym $gym): ?string
+    private function phoneMatchesGymContacts(string $phone, Gym $gym): bool
     {
-        $contact = Contact::where('gym_id', $gym->id)
+        $normalized = preg_replace('/\D/', '', $phone);
+
+        if (empty($normalized)) {
+            return false;
+        }
+
+        $phones = Contact::where('gym_id', $gym->id)
             ->where('type', 'business_phone')
             ->whereNotNull('value')
-            ->first();
-
-        if ($contact) {
-            return $contact->value;
-        }
+            ->pluck('value');
 
         $addressIds = $gym->addresses()->pluck('id');
         if ($addressIds->isNotEmpty()) {
-            $contact = Contact::whereIn('address_id', $addressIds)
-                ->where('type', 'business_phone')
-                ->whereNotNull('value')
-                ->first();
-
-            return $contact?->value;
+            $phones = $phones->merge(
+                Contact::whereIn('address_id', $addressIds)
+                    ->where('type', 'business_phone')
+                    ->whereNotNull('value')
+                    ->pluck('value')
+            );
         }
 
-        return null;
-    }
-
-    /**
-     * Strip scheme and www. to get the bare domain, e.g. "ironworksgym.com".
-     */
-    private function extractDomain(string $url): ?string
-    {
-        $parsed = parse_url($url);
-        $host   = $parsed['host'] ?? null;
-
-        if (!$host) {
-            $parsed = parse_url('https://' . $url);
-            $host   = $parsed['host'] ?? null;
-        }
-
-        return $host ? strtolower(preg_replace('/^www\./', '', $host)) : null;
+        return $phones
+            ->map(fn($p) => preg_replace('/\D/', '', $p))
+            ->contains($normalized);
     }
 
     private function dispatchEmailVerification(GymClaimRequest $claim, Gym $gym, string $code): void
     {
-        try {
-            $fullName = $claim->full_name;
-            $gymName  = $gym->name;
-            $toEmail  = $claim->business_email;
-
-            Mail::send(
-                'websquids.gymdirectory::mail.claim_verification',
-                compact('code', 'fullName', 'gymName'),
-                function ($message) use ($toEmail, $fullName, $gymName) {
-                    $message->to($toEmail, $fullName)
-                            ->subject('Verify Your Claim for ' . $gymName . ' on GymDues');
-                }
-            );
-            Log::info('VERIFICATION CODE VIA EMAIL ON ' . $toEmail . ': ' . $code);
-        } catch (\Exception $e) {
-            Log::error('GymClaimsController@dispatchEmailVerification: ' . $e->getMessage());
-        }
+        SendClaimVerificationEmailJob::dispatch(
+            $claim->business_email,
+            $claim->full_name,
+            $gym->name,
+            $code
+        );
     }
 
     private function dispatchApprovalEmail(GymClaimRequest $claim, Gym $gym, string $dashboardUrl): void
     {
-        try {
-            $fullName = $claim->full_name;
-            $gymName  = $gym->name;
-            $toEmail  = $claim->business_email;
-
-            Log::info('Email sent on ' . $toEmail);
-
-            Mail::send(
-                'websquids.gymdirectory::mail.claim_approved',
-                compact('fullName', 'gymName', 'dashboardUrl'),
-                function ($message) use ($toEmail, $fullName, $gymName) {
-                    $message->to($toEmail, $fullName)
-                            ->subject('You\'ve Successfully Claimed ' . $gymName . ' on GymDues');
-                }
-            );
-            Log::info('You\'ve Successfully Claimed ' . $gymName . ' on GymDues. Email sent on ' . $toEmail);
-        } catch (\Exception $e) {
-            Log::error('GymClaimsController@dispatchApprovalEmail: ' . $e->getMessage());
-        }
+        SendClaimApprovalEmailJob::dispatch(
+            $claim->business_email,
+            $claim->full_name,
+            $gym->name,
+            $dashboardUrl
+        );
     }
 
     private function notFound()

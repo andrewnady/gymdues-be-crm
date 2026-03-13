@@ -3,11 +3,12 @@
 use Backend\Classes\Controller;
 use BackendMenu;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\GymClaimRequest;
 use websquids\Gymdirectory\Classes\GymOwnerService;
+use Websquids\Gymdirectory\Jobs\SendClaimApprovalEmailJob;
+use Websquids\Gymdirectory\Jobs\SendClaimRejectedEmailJob;
 
 class GymClaims extends Controller
 {
@@ -34,17 +35,14 @@ class GymClaims extends Controller
      */
     public function formAfterSave($model)
     {
-        if (
-            $model->status === GymClaimRequest::STATUS_APPROVED &&
-            empty($model->user_id)
-        ) {
+        $gym = Gym::find($model->gym_id);
+
+        if ($model->status === GymClaimRequest::STATUS_APPROVED && empty($model->user_id)) {
             // Ensure verified_at is stamped if the admin forgot
             if (empty($model->verified_at)) {
                 $model->verified_at = now();
                 $model->save();
             }
-
-            $gym = Gym::find($model->gym_id);
 
             if (!$gym) {
                 Log::warning("GymClaims@formAfterSave: gym #{$model->gym_id} not found for claim #{$model->id}");
@@ -56,6 +54,14 @@ class GymClaims extends Controller
             $dashboardUrl = $service->buildMagicLoginUrl($magicToken);
 
             $this->dispatchApprovalEmail($model, $gym, $dashboardUrl);
+        }
+
+        if ($model->status === GymClaimRequest::STATUS_REJECTED && $gym) {
+            SendClaimRejectedEmailJob::dispatch(
+                $model->business_email,
+                $model->full_name,
+                $gym->name
+            );
         }
     }
 
@@ -94,22 +100,11 @@ class GymClaims extends Controller
 
     private function dispatchApprovalEmail(GymClaimRequest $claim, Gym $gym, string $dashboardUrl): void
     {
-        try {
-            $fullName = $claim->full_name;
-            $gymName  = $gym->name;
-            $toEmail  = $claim->business_email;
-
-            Mail::send(
-                'websquids.gymdirectory::mail.claim_approved',
-                compact('fullName', 'gymName', 'dashboardUrl'),
-                function ($message) use ($toEmail, $fullName, $gymName) {
-                    $message->to($toEmail, $fullName)
-                            ->subject('You\'ve Successfully Claimed ' . $gymName . ' on GymDues');
-                }
-            );
-            Log::info("GymClaims@formAfterSave: approval email sent to {$toEmail} for gym {$gymName}");
-        } catch (\Exception $e) {
-            Log::error('GymClaims@dispatchApprovalEmail: ' . $e->getMessage());
-        }
+        SendClaimApprovalEmailJob::dispatch(
+            $claim->business_email,
+            $claim->full_name,
+            $gym->name,
+            $dashboardUrl
+        );
     }
 }
