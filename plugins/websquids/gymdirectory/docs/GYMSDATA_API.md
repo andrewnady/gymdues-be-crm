@@ -712,5 +712,32 @@ Or run the plugin migration: `php artisan winter:up`.
 **Stripe checkout and callback**
 
 - **Checkout:** Send **name**, **email** and optional **state**, **city** (with state), **type**, or none. **Amount is calculated from row count** for that scope (same tiered pricing as list-page / state-page / city-page). Backend stores `data_state` / `data_city` / `data_type` and creates a Stripe Checkout Session. Response returns the session URL for redirect. **Return URLs:** `success_url` = `{GYMSDATA_FRONTEND_URL}/gymsdata/checkout/success?session_id={CHECKOUT_SESSION_ID}`, `cancel_url` = `{GYMSDATA_FRONTEND_URL}/gymsdata/checkout/cancel`. Set `GYMSDATA_FRONTEND_URL` (e.g. `https://gymdues.com`) in env; falls back to `APP_URL` if unset.
-- **Callback:** On `checkout.session.completed`, backend finds the row, sets `payment_status = 'paid'`, then emails an **Excel file** filtered by state+city, state only, type only, or full data, and sets `email_sent_at`. If sending fails, leave `email_sent_at` NULL so you can resend.
-- **Resend:** Use `POST /api/v1/gymsdata/resend-purchase-email` with the record `id` (and optional secret) to retry sending for rows where `payment_status = 'paid'` and `email_sent_at` is NULL (or force resend). On success, set `email_sent_at`.
+- **Callback:** On `charge.succeeded`, backend finds the row, sets `payment_status = 'paid'`, then **queues** a job to build the CSV and email it (filtered by state+city, state only, type only, or full data) and set `email_sent_at`. The webhook returns immediately; the email is sent in the background.
+- **Resend:** Use `POST /api/v1/gymsdata/resend-purchase-email` with the record `id` (and optional secret) to queue the same job for rows where `payment_status = 'paid'`. Response: `Email queued for sending`.
+
+**Background queue (required for purchase emails)**
+
+Purchase data export + email runs in a **queue job** so the webhook and resend endpoint return immediately and avoid timeouts. You must:
+
+1. **Use a non-sync queue driver** in `.env`:
+   ```env
+   QUEUE_CONNECTION=database
+   ```
+   (Or `redis` if you use Redis.)
+
+2. **Create the jobs table** (if using `database` driver). Winter’s system migrations often add it; if not, run:
+   ```bash
+   php artisan queue:table
+   php artisan migrate
+   ```
+   Or `php artisan winter:up` to run all migrations.
+
+3. **Run a queue worker** (keep it running, e.g. via supervisor or a long-lived process):
+   ```bash
+   php artisan queue:work
+   ```
+   Optional: `php artisan queue:work --queue=default --tries=2` to process the `default` queue with 2 attempts.
+
+   On production, run the worker as a service (e.g. systemd or Supervisor) so it restarts on failure.
+
+If `QUEUE_CONNECTION=sync`, jobs run in the same request (no background); the webhook may hit timeouts on large exports.
