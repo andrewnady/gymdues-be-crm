@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Stripe;
 use Stripe\Webhook;
+use Websquids\Gymdirectory\Jobs\SendPurchaseDataEmailJob;
 
 /**
  * API for gymsdata site — uses PostgreSQL only (connection "gymsdata").
@@ -1629,13 +1630,17 @@ class GymsdataController extends Controller
      */
     protected function getPriceForRowCount(int $rowCount): int
     {
+        return 1;
         $tiers = [
-            150001 => 249,
-            50001  => 149,
-            10001  => 99,
-            2001   => 79,
-            501    => 49,
-            0      => 29,
+            70000 => 599,
+            60000  => 249,
+            49000  => 199,
+            39000  => 179,
+            24000  => 149,
+            20000  => 129,
+            13000  => 119,
+            8000   => 109,
+            0      => 99,
         ];
         krsort($tiers, SORT_NUMERIC);
         foreach ($tiers as $minRows => $usd) {
@@ -1643,7 +1648,28 @@ class GymsdataController extends Controller
                 return $usd;
             }
         }
-        return 29;
+        return 99;
+    }
+
+    /**
+     * Human-readable item description for invoice (purchase scope: full, state, city, or type).
+     */
+    protected function purchaseItemDescription(?string $dataState, ?string $dataCity, ?string $dataType): string
+    {
+        if ($dataState && $dataCity) {
+            return 'Gyms data: ' . $dataCity . ', ' . $dataState;
+        }
+        if ($dataState) {
+            $out = 'Gyms data: ' . $dataState;
+            if ($dataType) {
+                $out .= ' (' . $dataType . ')';
+            }
+            return $out;
+        }
+        if ($dataType) {
+            return 'Gyms data: ' . $dataType;
+        }
+        return 'Full gyms data download';
     }
 
     /**
@@ -1772,11 +1798,11 @@ class GymsdataController extends Controller
             $filename = 'gymdues-sample.csv';
             $toEmail = $request->input('email');
             $toName = $request->input('name');
-            /* Mail::raw('Please find your gyms sample data attached (CSV).', function ($message) use ($path, $filename, $toEmail, $toName) {
+            Mail::raw('Please find your gyms sample data attached (CSV).', function ($message) use ($path, $filename, $toEmail, $toName) {
                 $message->to($toEmail, $toName)
                     ->subject('Your gyms sample data');
                 $message->attach($path, ['as' => $filename, 'mime' => 'text/csv']);
-            }); */
+            });
             return response()->download($path, $filename, [
                 'Content-Type' => 'text/csv',
             ])->deleteFileAfterSend(true);
@@ -1806,7 +1832,7 @@ class GymsdataController extends Controller
         if ($request->filled('city') && ! $request->filled('state')) {
             return response()->json(['error' => 'State is required when city is provided'], 422);
         }
-        $key = env('STRIPE_SECRET');
+        $key = env('STRIPE_SECRET_KEY');
         if (! $key) {
             Log::warning('GymsdataController@createCheckout: STRIPE_SECRET not set');
             return response()->json(['error' => 'Payments not configured'], 503);
@@ -1921,7 +1947,7 @@ class GymsdataController extends Controller
             return response()->json(['received' => true]);
         }
         try {
-            $key = env('STRIPE_SECRET');
+            $key = env('STRIPE_SECRET_KEY');
             if (! $key) {
                 return response()->json(['error' => 'Server configuration error'], 500);
             }
@@ -1944,7 +1970,7 @@ class GymsdataController extends Controller
                 'payment_status' => 'paid',
                 'updated_at' => now(),
             ]);
-            $this->sendPurchaseDataToEmail((int) $row->id);
+            SendPurchaseDataEmailJob::dispatch((int) $row->id);
             return response()->json(['received' => true]);
         } catch (\Exception $e) {
             Log::error('GymsdataController@stripeWebhook: ' . $e->getMessage());
@@ -1974,8 +2000,8 @@ class GymsdataController extends Controller
             if (! $row) {
                 return response()->json(['error' => 'Purchase not found or not paid'], 404);
             }
-            $this->sendPurchaseDataToEmail($id);
-            return response()->json(['success' => true, 'message' => 'Email sent']);
+            SendPurchaseDataEmailJob::dispatch($id);
+            return response()->json(['success' => true, 'message' => 'Email queued for sending']);
         } catch (\Exception $e) {
             Log::error('GymsdataController@resendPurchaseEmail: ' . $e->getMessage());
             return response()->json(['error' => 'Resend failed', 'message' => $e->getMessage()], 500);
@@ -1984,15 +2010,16 @@ class GymsdataController extends Controller
 
     /**
      * Send full gyms data as CSV to customer email for a paid purchase (streaming export to avoid memory exhaustion).
-     * Sets email_sent_at on success.
+     * Sets email_sent_at on success. Called by SendPurchaseDataEmailJob when run via queue.
      */
-    protected function sendPurchaseDataToEmail(int $downloadId): void
+    public function sendPurchaseDataToEmail(int $downloadId): void
     {
+        set_time_limit(0); // No limit: large export + SMTP upload can take several minutes
         $conn = DB::connection('gymsdata');
         $row = $conn->table('downloads')->where('id', $downloadId)->first();
-        if (! $row || $row->type !== 'purchase' || $row->payment_status !== 'paid') {
+        /* if (! $row || $row->type !== 'purchase' || $row->payment_status !== 'paid') {
             return;
-        }
+        } */
         $email = $row->email;
         $name = $row->name ?? 'Customer';
         $dataState = $row->data_state ?? null;
@@ -2010,11 +2037,23 @@ class GymsdataController extends Controller
             } else {
                 $filename = 'gymdues-full-data.csv';
             }
-            /* Mail::raw('Thank you for your purchase. Your full gyms data is attached (CSV; open in Excel or any spreadsheet app).', function ($message) use ($path, $filename, $email, $name) {
+            $itemDescription = $this->purchaseItemDescription($dataState, $dataCity, $dataType);
+            $orderDate = $row->created_at ? (\Carbon\Carbon::parse($row->created_at)->format('F j, Y')) : date('F j, Y');
+            $amount = isset($row->amount) ? (string) (int) $row->amount : '0';
+            $mailData = [
+                'name' => $name,
+                'email' => $email,
+                'order_id' => (string) $downloadId,
+                'order_date' => $orderDate,
+                'item_description' => $itemDescription,
+                'amount' => $amount,
+                'filename' => $filename,
+            ];
+            Mail::send('websquids.gymdirectory::mail.purchase-download', $mailData, function ($message) use ($path, $filename, $email, $name) {
                 $message->to($email, $name)
-                    ->subject('Your gymdues data download');
+                    ->subject('Your Gymdues data download');
                 $message->attach($path, ['as' => $filename, 'mime' => 'text/csv']);
-            }); */
+            });
             $conn->table('downloads')->where('id', $downloadId)->update([
                 'email_sent_at' => now(),
                 'updated_at' => now(),
