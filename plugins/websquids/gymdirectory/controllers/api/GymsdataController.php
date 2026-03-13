@@ -1019,7 +1019,7 @@ class GymsdataController extends Controller
                 ->distinct()
                 ->pluck('type');
             foreach ($typeRows as $typeName) {
-                $pathSet['gymsdata/types/' . $this->slugFromName($typeName)] = true;
+                $pathSet['gymsdata/' . $this->slugFromName($typeName)] = true;
             }
 
             $out = [''];
