@@ -41,6 +41,8 @@ class GymClaimRequest extends Model
     const METHOD_EMAIL_DOMAIN = 'email_domain';
     const METHOD_PHONE_SMS    = 'phone_sms';
     const METHOD_DOCUMENT     = 'document';
+    const METHOD_EMAIL_MATCHED     = 'email_matched';
+    const METHOD_PHONE_MATCHED     = 'phone_matched';
 
     // Statuses
     const STATUS_PENDING           = 'pending';
