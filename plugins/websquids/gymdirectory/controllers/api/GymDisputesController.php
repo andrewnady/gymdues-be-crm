@@ -5,12 +5,15 @@ namespace Websquids\Gymdirectory\Controllers\Api;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use websquids\Gymdirectory\Models\Gym;
 use websquids\Gymdirectory\Models\GymClaimRequest;
 use websquids\Gymdirectory\Models\GymClaimDispute;
 use websquids\Gymdirectory\Classes\GymOwnerService;
 use Winter\User\Models\User;
+use Websquids\Gymdirectory\Jobs\SendDisputeReceivedEmailJob;
+use Websquids\Gymdirectory\Jobs\SendDisputeApprovedEmailJob;
+use Websquids\Gymdirectory\Jobs\SendDisputeRejectedEmailJob;
+use Websquids\Gymdirectory\Jobs\SendClaimRevokedEmailJob;
 
 /**
  * GymDisputesController
@@ -347,82 +350,39 @@ class GymDisputesController extends Controller
 
     private function dispatchDisputeReceivedEmail(GymClaimDispute $dispute, Gym $gym): void
     {
-        try {
-            $fullName = $dispute->full_name;
-            $gymName  = $gym->name;
-            $toEmail  = $dispute->business_email;
-
-            Mail::send(
-                'websquids.gymdirectory::mail.dispute_received',
-                compact('fullName', 'gymName'),
-                function ($message) use ($toEmail, $fullName, $gymName) {
-                    $message->to($toEmail, $fullName)
-                            ->subject('Dispute Received for ' . $gymName . ' – GymDues');
-                }
-            );
-        } catch (\Exception $e) {
-            Log::error('GymDisputesController@dispatchDisputeReceivedEmail: ' . $e->getMessage());
-        }
+        SendDisputeReceivedEmailJob::dispatch(
+            $dispute->business_email,
+            $dispute->full_name,
+            $gym->name
+        );
     }
 
     private function dispatchDisputeApprovedEmail(GymClaimDispute $dispute, Gym $gym, string $dashboardUrl): void
     {
-        try {
-            $fullName = $dispute->full_name;
-            $gymName  = $gym->name;
-            $toEmail  = $dispute->business_email;
-
-            Mail::send(
-                'websquids.gymdirectory::mail.dispute_approved',
-                compact('fullName', 'gymName', 'dashboardUrl'),
-                function ($message) use ($toEmail, $fullName, $gymName) {
-                    $message->to($toEmail, $fullName)
-                            ->subject('Dispute Approved – You\'ve Claimed ' . $gymName . ' on GymDues');
-                }
-            );
-        } catch (\Exception $e) {
-            Log::error('GymDisputesController@dispatchDisputeApprovedEmail: ' . $e->getMessage());
-        }
+        SendDisputeApprovedEmailJob::dispatch(
+            $dispute->business_email,
+            $dispute->full_name,
+            $gym->name,
+            $dashboardUrl
+        );
     }
 
     private function dispatchDisputeRejectedEmail(GymClaimDispute $dispute, Gym $gym): void
     {
-        try {
-            $fullName = $dispute->full_name;
-            $gymName  = $gym->name;
-            $toEmail  = $dispute->business_email;
-
-            Mail::send(
-                'websquids.gymdirectory::mail.dispute_rejected',
-                compact('fullName', 'gymName'),
-                function ($message) use ($toEmail, $fullName, $gymName) {
-                    $message->to($toEmail, $fullName)
-                            ->subject('Dispute Update for ' . $gymName . ' – GymDues');
-                }
-            );
-        } catch (\Exception $e) {
-            Log::error('GymDisputesController@dispatchDisputeRejectedEmail: ' . $e->getMessage());
-        }
+        SendDisputeRejectedEmailJob::dispatch(
+            $dispute->business_email,
+            $dispute->full_name,
+            $gym->name
+        );
     }
 
     private function dispatchClaimRevokedEmail(GymClaimRequest $claim, Gym $gym): void
     {
-        try {
-            $fullName = $claim->full_name;
-            $gymName  = $gym->name;
-            $toEmail  = $claim->business_email;
-
-            Mail::send(
-                'websquids.gymdirectory::mail.claim_revoked',
-                compact('fullName', 'gymName'),
-                function ($message) use ($toEmail, $fullName, $gymName) {
-                    $message->to($toEmail, $fullName)
-                            ->subject('Important: Your Claim for ' . $gymName . ' Has Been Revoked – GymDues');
-                }
-            );
-        } catch (\Exception $e) {
-            Log::error('GymDisputesController@dispatchClaimRevokedEmail: ' . $e->getMessage());
-        }
+        SendClaimRevokedEmailJob::dispatch(
+            $claim->business_email,
+            $claim->full_name,
+            $gym->name
+        );
     }
 
     private function notFound()
