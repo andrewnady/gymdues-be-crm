@@ -1630,7 +1630,6 @@ class GymsdataController extends Controller
      */
     protected function getPriceForRowCount(int $rowCount): int
     {
-        return 1;
         $tiers = [
             70000 => 599,
             60000  => 249,
