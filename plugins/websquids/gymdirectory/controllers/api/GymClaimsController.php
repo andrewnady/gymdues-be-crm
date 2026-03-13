@@ -248,8 +248,7 @@ class GymClaimsController extends Controller
         }
 
         $gym   = Gym::findOrFail($claim->gym_id);
-        // $phone = $request->input('phone_number');
-        $phone = '+18777804236';
+        $phone = $request->input('phone_number');
 
         // Update method and send code
         $claim->verification_method = GymClaimRequest::METHOD_PHONE_SMS;
