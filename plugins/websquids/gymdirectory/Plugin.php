@@ -1,9 +1,10 @@
 <?php namespace websquids\Gymdirectory;
 
 use System\Classes\PluginBase;
-use websquids\Gymdirectory\Console\BatchGenerateBestGymsPages;
-use websquids\Gymdirectory\Console\FixBestGymsPageAddresses;
-use websquids\Gymdirectory\Console\GenerateBestGymsPages;
+use Websquids\Gymdirectory\Console\BatchGenerateBestGymsPages;
+use Websquids\Gymdirectory\Console\FixBestGymsPageAddresses;
+use Websquids\Gymdirectory\Console\GenerateBestGymsPages;
+use websquids\Gymdirectory\Console\PreGenerateGymsdataExports;
 
 class Plugin extends PluginBase
 {
@@ -34,6 +35,7 @@ class Plugin extends PluginBase
         $this->registerConsoleCommand('gymdirectory:generate-best-gyms-pages', GenerateBestGymsPages::class);
         $this->registerConsoleCommand('gymdirectory:batch-generate-best-gyms-pages', BatchGenerateBestGymsPages::class);
         $this->registerConsoleCommand('gymdirectory:fix-best-gyms-page-addresses', FixBestGymsPageAddresses::class);
+        $this->registerConsoleCommand('gymdirectory:pregenerate-gymsdata-exports', PreGenerateGymsdataExports::class);
     }
 
 
