@@ -5,16 +5,15 @@ use Illuminate\Support\Facades\DB;
 use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 
 /**
- * Pre-generate all gymsdata export ZIPs (full, by type, by state, by city).
- * Run weekly via cron so purchase emails attach pre-built files instead of generating on demand.
- * Files are stored in storage/app/gymsdata_exports/.
+ * Pre-generate gymsdata export ZIPs for full dataset, types, and states only.
+ * City exports are not pre-generated; they are built on demand when a user purchases that city.
+ * Run weekly via cron. Files are stored in storage/app/gymsdata_exports/.
  *
  * Usage:
  *   php artisan gymdirectory:pregenerate-gymsdata-exports
  *   php artisan gymdirectory:pregenerate-gymsdata-exports --full
  *   php artisan gymdirectory:pregenerate-gymsdata-exports --types
  *   php artisan gymdirectory:pregenerate-gymsdata-exports --states
- *   php artisan gymdirectory:pregenerate-gymsdata-exports --cities
  *
  * Cron (weekly, e.g. Sunday 2am):
  *   0 2 * * 0 cd /var/www/your-app && php artisan gymdirectory:pregenerate-gymsdata-exports >> /var/log/gymsdata-exports.log 2>&1
@@ -24,10 +23,9 @@ class PreGenerateGymsdataExports extends Command
     protected $signature = 'gymdirectory:pregenerate-gymsdata-exports
         {--full : Only full dataset}
         {--types : Only per-type}
-        {--states : Only per-state}
-        {--cities : Only per-city}';
+        {--states : Only per-state}';
 
-    protected $description = 'Pre-generate all gymsdata export ZIPs for fast purchase email delivery (run weekly via cron).';
+    protected $description = 'Pre-generate gymsdata export ZIPs (full, types, states). City exports are generated on download.';
 
     public function handle(): int
     {
@@ -38,11 +36,9 @@ class PreGenerateGymsdataExports extends Command
         $fullOnly = (bool) $this->option('full');
         $typesOnly = (bool) $this->option('types');
         $statesOnly = (bool) $this->option('states');
-        $citiesOnly = (bool) $this->option('cities');
-        $doFull = $fullOnly || (! $typesOnly && ! $statesOnly && ! $citiesOnly);
-        $doTypes = $typesOnly || (! $fullOnly && ! $statesOnly && ! $citiesOnly);
-        $doStates = $statesOnly || (! $fullOnly && ! $typesOnly && ! $citiesOnly);
-        $doCities = $citiesOnly || (! $fullOnly && ! $typesOnly && ! $statesOnly);
+        $doFull = $fullOnly || (! $typesOnly && ! $statesOnly);
+        $doTypes = $typesOnly || (! $fullOnly && ! $statesOnly);
+        $doStates = $statesOnly || (! $fullOnly && ! $typesOnly);
 
         $generated = 0;
         $failed = 0;
@@ -92,28 +88,6 @@ class PreGenerateGymsdataExports extends Command
                     $generated++;
                 } catch (\Throwable $e) {
                     $this->error('  FAIL state ' . $state . ': ' . $e->getMessage());
-                    $failed++;
-                }
-            }
-        }
-
-        if ($doCities) {
-            $cityRows = $conn->table($table)
-                ->select('state', 'city')
-                ->whereNotNull('state')
-                ->where('state', '!=', '')
-                ->whereNotNull('city')
-                ->where('city', '!=', '')
-                ->distinct()
-                ->get();
-            $this->info('Generating ' . $cityRows->count() . ' city export(s)...');
-            foreach ($cityRows as $row) {
-                try {
-                    $controller->buildAndSavePreGeneratedExport($row->state, $row->city, null);
-                    $this->line('  OK city: ' . $row->city . ', ' . $row->state);
-                    $generated++;
-                } catch (\Throwable $e) {
-                    $this->error('  FAIL city ' . $row->city . ',' . $row->state . ': ' . $e->getMessage());
                     $failed++;
                 }
             }
