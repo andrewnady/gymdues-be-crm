@@ -8,11 +8,14 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Stripe;
 use Stripe\Webhook;
+use System\Helpers\View as ViewHelper;
+use System\Models\MailTemplate;
 use Websquids\Gymdirectory\Jobs\SendPurchaseDataEmailJob;
 
 /**
@@ -1755,6 +1758,25 @@ class GymsdataController extends Controller
     }
 
     /**
+     * Render a mail template to HTML using Twig only (no Markdown).
+     * Use this when mbstring is missing to avoid league/commonmark calling mb_strcut().
+     * Returns ['html' => string, 'subject' => string].
+     */
+    protected function renderMailTemplateWithoutMarkdown(string $templateCode, array $data): array
+    {
+        $template = MailTemplate::findOrMakeTemplate($templateCode);
+        if (! $template || ! strlen($template->content_html ?? '')) {
+            return ['html' => '', 'subject' => ''];
+        }
+        $data = (array) $data + (array) ViewHelper::getGlobalVars();
+        $twig = App::make('twig.environment.mailer');
+        $html = $twig->createTemplate($template->content_html)->render($data);
+        $subject = $twig->createTemplate($template->subject)->render($data);
+
+        return ['html' => $html, 'subject' => $subject];
+    }
+
+    /**
      * POST /api/v1/gymsdata/sample-download
      * Body: name, email; optional: state, city (state+city = city page), type, or none (full).
      * If city is sent, state is required.
@@ -1793,13 +1815,34 @@ class GymsdataController extends Controller
             $this->applyCompleteDataScope($query);
             $this->applyDataScope($query, $request->input('state'), $request->input('city'), $request->input('type'));
             $sampleRows = $query->get();
+            if ($sampleRows->isEmpty()) {
+                $queryRelaxed = $this->table()
+                    ->orderBy('id')
+                    ->limit($sampleSize);
+                $this->applyDataScope($queryRelaxed, $request->input('state'), $request->input('city'), $request->input('type'));
+                $sampleRows = $queryRelaxed->get();
+            }
             $path = $this->buildGymsCsvPath($sampleRows);
             $filename = 'gymdues-sample.csv';
             $toEmail = $request->input('email');
             $toName = $request->input('name');
-            Mail::raw('Please find your gyms sample data attached (CSV).', function ($message) use ($path, $filename, $toEmail, $toName) {
+            $scopeParts = array_filter([
+                $request->filled('state') ? trim($request->input('state')) : null,
+                $request->filled('city') ? trim($request->input('city')) : null,
+                $request->filled('type') ? trim($request->input('type')) : null,
+            ]);
+            $scopeDescription = !empty($scopeParts) ? implode(', ', $scopeParts) : null;
+            $mailData = [
+                'name' => $toName,
+                'filename' => $filename,
+                'scope_description' => $scopeDescription,
+            ];
+            $rendered = $this->renderMailTemplateWithoutMarkdown('websquids.gymdirectory::mail.sample-download', $mailData);
+            $mailHtml = $rendered['html'] ?: '<p>Please find your sample data attached (CSV).</p>';
+            $mailSubject = $rendered['subject'] ?: 'Your Fitness, Gym, and Health Services sample data – Gymdues';
+            Mail::send(['raw' => true, 'html' => $mailHtml], [], function ($message) use ($path, $filename, $toEmail, $toName, $mailSubject) {
                 $message->to($toEmail, $toName)
-                    ->subject('Your gyms sample data');
+                    ->subject($mailSubject);
                 $message->attach($path, ['as' => $filename, 'mime' => 'text/csv']);
             });
             return response()->download($path, $filename, [
@@ -2016,9 +2059,9 @@ class GymsdataController extends Controller
         set_time_limit(0); // No limit: large export + SMTP upload can take several minutes
         $conn = DB::connection('gymsdata');
         $row = $conn->table('downloads')->where('id', $downloadId)->first();
-        /* if (! $row || $row->type !== 'purchase' || $row->payment_status !== 'paid') {
+        if (! $row || $row->type !== 'purchase' || $row->payment_status !== 'paid') {
             return;
-        } */
+        }
         $email = $row->email;
         $name = $row->name ?? 'Customer';
         $dataState = $row->data_state ?? null;
@@ -2048,9 +2091,12 @@ class GymsdataController extends Controller
                 'amount' => $amount,
                 'filename' => $filename,
             ];
-            Mail::send('websquids.gymdirectory::mail.purchase-download', $mailData, function ($message) use ($path, $filename, $email, $name) {
+            $rendered = $this->renderMailTemplateWithoutMarkdown('websquids.gymdirectory::mail.purchase-download', $mailData);
+            $mailHtml = $rendered['html'] ?: '<p>Thank you for your purchase. Your data file is attached.</p>';
+            $mailSubject = $rendered['subject'] ?: 'Your Fitness, Gym, and Health Services data download';
+            Mail::send(['raw' => true, 'html' => $mailHtml], [], function ($message) use ($path, $filename, $email, $name, $mailSubject) {
                 $message->to($email, $name)
-                    ->subject('Your Gymdues data download');
+                    ->subject($mailSubject);
                 $message->attach($path, ['as' => $filename, 'mime' => 'text/csv']);
             });
             $conn->table('downloads')->where('id', $downloadId)->update([
