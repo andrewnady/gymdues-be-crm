@@ -12,6 +12,9 @@ use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 /**
  * Runs the purchase data export + email in the background so the webhook/resend endpoint returns immediately.
  * Requires QUEUE_CONNECTION=database (or redis) and a running queue worker: php artisan queue:work
+ *
+ * After deploying code changes: restart the queue worker so it loads the new mail logic
+ * (e.g. php artisan queue:restart, or restart the worker process/supervisor).
  */
 class SendPurchaseDataEmailJob implements ShouldQueue
 {

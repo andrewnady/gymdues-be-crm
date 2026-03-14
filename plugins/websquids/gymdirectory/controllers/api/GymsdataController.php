@@ -161,6 +161,90 @@ class GymsdataController extends Controller
         return $path;
     }
 
+    /**
+     * Compress a file into a .zip (e.g. for email attachment to stay under size limits).
+     * Returns path to the zip file. Caller should unlink both csv path and zip path when done.
+     * If $destinationPath is set, the zip is written there; otherwise next to the source file.
+     */
+    protected function zipFile(string $filePath, ?string $entryName = null, ?string $destinationPath = null): string
+    {
+        if (! class_exists(\ZipArchive::class)) {
+            throw new \RuntimeException('ZipArchive is required to compress the export. Enable php zip extension.');
+        }
+        $zipPath = $destinationPath;
+        if ($zipPath === null) {
+            $zipPath = preg_replace('/\.(csv|txt)$/i', '.zip', $filePath);
+            if ($zipPath === $filePath) {
+                $zipPath = $filePath . '.zip';
+            }
+        }
+        $entryName = $entryName ?? basename($filePath);
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException('Could not create zip file: ' . $zipPath);
+        }
+        $zip->addFile($filePath, $entryName);
+        $zip->close();
+
+        return $zipPath;
+    }
+
+    /** Directory for pre-generated export ZIPs (e.g. for weekly cron). */
+    protected function getPreGeneratedExportDir(): string
+    {
+        $dir = storage_path('app/gymsdata_exports');
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        return $dir;
+    }
+
+    /**
+     * Export filename for a given scope (same as used in email attachment).
+     * E.g. gymdues-full-data.zip, gymdues-data-california.zip, gymdues-data-ca-los-angeles.zip.
+     */
+    protected function getExportFilename(?string $dataState, ?string $dataCity, ?string $dataType): string
+    {
+        if (($dataState !== null && $dataState !== '') && ($dataCity !== null && $dataCity !== '')) {
+            $baseName = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', trim($dataState))) . '-' . strtolower(preg_replace('/\s+/', '-', trim($dataCity)));
+        } elseif ($dataState !== null && $dataState !== '') {
+            $baseName = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', trim($dataState)));
+        } elseif ($dataType !== null && $dataType !== '') {
+            $baseName = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', trim($dataType)));
+        } else {
+            $baseName = 'gymdues-full-data';
+        }
+        return $baseName . '.zip';
+    }
+
+    /** Full path to pre-generated ZIP if it exists. */
+    protected function getPreGeneratedExportPath(?string $dataState, ?string $dataCity, ?string $dataType): string
+    {
+        return $this->getPreGeneratedExportDir() . '/' . $this->getExportFilename($dataState, $dataCity, $dataType);
+    }
+
+    /**
+     * Build CSV, zip it, and save to the pre-generated export directory.
+     * Returns path to the saved ZIP. Used by the weekly cron command.
+     */
+    public function buildAndSavePreGeneratedExport(?string $dataState, ?string $dataCity, ?string $dataType): string
+    {
+        $csvPath = null;
+        try {
+            $csvPath = $this->buildFullGymsCsvPath(null, $dataState, $dataCity, $dataType);
+            $filename = $this->getExportFilename($dataState, $dataCity, $dataType);
+            $csvName = preg_replace('/\.zip$/i', '.csv', $filename);
+            $exportDir = $this->getPreGeneratedExportDir();
+            $zipPath = $exportDir . '/' . $filename;
+            $this->zipFile($csvPath, $csvName, $zipPath);
+            return $zipPath;
+        } finally {
+            if ($csvPath && is_file($csvPath)) {
+                @unlink($csvPath);
+            }
+        }
+    }
+
     /** State code → full name (e.g. CA → California). */
     protected function stateNames(string $code): string
     {
@@ -880,8 +964,8 @@ class GymsdataController extends Controller
         $chains = [
             [
                 'chainName' => 'Planet Fitness',
-                'locations' => 2800,
-                'locationsLabel' => '2,800+',
+                'locations' => 5656,
+                'locationsLabel' => '5,656+',
                 'avgPrice' => 15,
                 'avgPriceLabel' => '$15/mo',
                 'amenitiesScore' => 6.8,
@@ -891,8 +975,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => 'Anytime Fitness',
-                'locations' => 5500,
-                'locationsLabel' => '5,500+',
+                'locations' => 8062,
+                'locationsLabel' => '8,062+',
                 'avgPrice' => 55,
                 'avgPriceLabel' => '$55/mo',
                 'amenitiesScore' => 7.2,
@@ -902,8 +986,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => 'Gold’s Gym',
-                'locations' => 600,
-                'locationsLabel' => '600+',
+                'locations' => 1660,
+                'locationsLabel' => '1,660+',
                 'avgPrice' => 50,
                 'avgPriceLabel' => '$50/mo',
                 'amenitiesScore' => 8.8,
@@ -913,8 +997,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => 'Crunch Fitness',
-                'locations' => 450,
-                'locationsLabel' => '450+',
+                'locations' => 112,
+                'locationsLabel' => '112+',
                 'avgPrice' => 15,
                 'avgPriceLabel' => '$15/mo',
                 'amenitiesScore' => 8.2,
@@ -924,8 +1008,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => 'Snap Fitness',
-                'locations' => 1000,
-                'locationsLabel' => '1,000+',
+                'locations' => 3363,
+                'locationsLabel' => '3,363+',
                 'avgPrice' => 45,
                 'avgPriceLabel' => '$45/mo',
                 'amenitiesScore' => 6.5,
@@ -935,8 +1019,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => 'F45 Training',
-                'locations' => 2000,
-                'locationsLabel' => '2,000+',
+                'locations' => 33,
+                'locationsLabel' => '33+',
                 'avgPrice' => 175,
                 'avgPriceLabel' => '$175/mo',
                 'amenitiesScore' => 7.0,
@@ -946,8 +1030,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => '24 Hour Fitness',
-                'locations' => 450,
-                'locationsLabel' => '450+',
+                'locations' => 1799,
+                'locationsLabel' => '1,799+',
                 'avgPrice' => 35,
                 'avgPriceLabel' => '$35/mo',
                 'amenitiesScore' => 8.0,
@@ -957,8 +1041,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => 'Retro Fitness',
-                'locations' => 120,
-                'locationsLabel' => '120+',
+                'locations' => 750,
+                'locationsLabel' => '750+',
                 'avgPrice' => 25,
                 'avgPriceLabel' => '$25/mo',
                 'amenitiesScore' => 8.4,
@@ -968,8 +1052,8 @@ class GymsdataController extends Controller
             ],
             [
                 'chainName' => 'Orangetheory Fitness',
-                'locations' => 1500,
-                'locationsLabel' => '1,500+',
+                'locations' => 7038,
+                'locationsLabel' => '7,038+',
                 'avgPrice' => 160,
                 'avgPriceLabel' => '$160/mo',
                 'amenitiesScore' => 7.8,
@@ -2053,6 +2137,7 @@ class GymsdataController extends Controller
     /**
      * Send full gyms data as CSV to customer email for a paid purchase (streaming export to avoid memory exhaustion).
      * Sets email_sent_at on success. Called by SendPurchaseDataEmailJob when run via queue.
+     * Uses raw HTML send (no Markdown) to avoid mb_strcut() when mbstring extension is missing.
      */
     public function sendPurchaseDataToEmail(int $downloadId): void
     {
@@ -2068,16 +2153,19 @@ class GymsdataController extends Controller
         $dataCity = $row->data_city ?? null;
         $dataType = $row->data_type ?? null;
         $path = null;
+        $zipPath = null;
+        $usePreGenerated = false;
+        $filename = $this->getExportFilename($dataState, $dataCity, $dataType);
+        $preGenPath = $this->getPreGeneratedExportPath($dataState, $dataCity, $dataType);
+        if (is_file($preGenPath)) {
+            $zipPath = $preGenPath;
+            $usePreGenerated = true;
+        }
         try {
-            $path = $this->buildFullGymsCsvPath(null, $dataState, $dataCity, $dataType);
-            if ($dataState && $dataCity) {
-                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataState)) . '-' . strtolower(preg_replace('/\s+/', '-', $dataCity)) . '.csv';
-            } elseif ($dataState) {
-                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataState)) . '.csv';
-            } elseif ($dataType) {
-                $filename = 'gymdues-data-' . strtolower(preg_replace('/\s+/', '-', $dataType)) . '.csv';
-            } else {
-                $filename = 'gymdues-full-data.csv';
+            if (! $usePreGenerated) {
+                $path = $this->buildFullGymsCsvPath(null, $dataState, $dataCity, $dataType);
+                $csvName = preg_replace('/\.zip$/i', '.csv', $filename);
+                $zipPath = $this->zipFile($path, $csvName);
             }
             $itemDescription = $this->purchaseItemDescription($dataState, $dataCity, $dataType);
             $orderDate = $row->created_at ? (\Carbon\Carbon::parse($row->created_at)->format('F j, Y')) : date('F j, Y');
@@ -2092,12 +2180,12 @@ class GymsdataController extends Controller
                 'filename' => $filename,
             ];
             $rendered = $this->renderMailTemplateWithoutMarkdown('websquids.gymdirectory::mail.purchase-download', $mailData);
-            $mailHtml = $rendered['html'] ?: '<p>Thank you for your purchase. Your data file is attached.</p>';
+            $mailHtml = $rendered['html'] ?: '<p>Thank you for your purchase. Your data file is attached as a ZIP (contains CSV inside).</p>';
             $mailSubject = $rendered['subject'] ?: 'Your Fitness, Gym, and Health Services data download';
-            Mail::send(['raw' => true, 'html' => $mailHtml], [], function ($message) use ($path, $filename, $email, $name, $mailSubject) {
+            Mail::send(['raw' => true, 'html' => $mailHtml], [], function ($message) use ($zipPath, $filename, $email, $name, $mailSubject) {
                 $message->to($email, $name)
                     ->subject($mailSubject);
-                $message->attach($path, ['as' => $filename, 'mime' => 'text/csv']);
+                $message->attach($zipPath, ['as' => $filename, 'mime' => 'application/zip']);
             });
             $conn->table('downloads')->where('id', $downloadId)->update([
                 'email_sent_at' => now(),
@@ -2109,6 +2197,9 @@ class GymsdataController extends Controller
         } finally {
             if ($path && is_file($path)) {
                 @unlink($path);
+            }
+            if (! $usePreGenerated && $zipPath && is_file($zipPath)) {
+                @unlink($zipPath);
             }
         }
     }
