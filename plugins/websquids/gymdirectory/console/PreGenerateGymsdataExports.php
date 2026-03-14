@@ -11,10 +11,10 @@ use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
  *
  * Usage:
  *   php artisan gymdirectory:pregenerate-gymsdata-exports
- *   php artisan gymdirectory:pregenerate-gymsdata-exports --full-only
- *   php artisan gymdirectory:pregenerate-gymsdata-exports --types-only
- *   php artisan gymdirectory:pregenerate-gymsdata-exports --states-only
- *   php artisan gymdirectory:pregenerate-gymsdata-exports --cities-only
+ *   php artisan gymdirectory:pregenerate-gymsdata-exports --full
+ *   php artisan gymdirectory:pregenerate-gymsdata-exports --types
+ *   php artisan gymdirectory:pregenerate-gymsdata-exports --states
+ *   php artisan gymdirectory:pregenerate-gymsdata-exports --cities
  *
  * Cron (weekly, e.g. Sunday 2am):
  *   0 2 * * 0 cd /var/www/your-app && php artisan gymdirectory:pregenerate-gymsdata-exports >> /var/log/gymsdata-exports.log 2>&1
@@ -22,10 +22,10 @@ use Websquids\Gymdirectory\Controllers\Api\GymsdataController;
 class PreGenerateGymsdataExports extends Command
 {
     protected $signature = 'gymdirectory:pregenerate-gymsdata-exports
-        {--full-only   : Only generate the full dataset}
-        {--types-only : Only generate per-type exports}
-        {--states-only: Only generate per-state exports}
-        {--cities-only: Only generate per-state+city exports}';
+        {--full : Only full dataset}
+        {--types : Only per-type}
+        {--states : Only per-state}
+        {--cities : Only per-city}';
 
     protected $description = 'Pre-generate all gymsdata export ZIPs for fast purchase email delivery (run weekly via cron).';
 
@@ -35,10 +35,10 @@ class PreGenerateGymsdataExports extends Command
         $table = config('database.gymsdata_table', 'gyms_data');
         $conn = DB::connection('gymsdata');
 
-        $fullOnly = (bool) $this->option('full-only');
-        $typesOnly = (bool) $this->option('types-only');
-        $statesOnly = (bool) $this->option('states-only');
-        $citiesOnly = (bool) $this->option('cities-only');
+        $fullOnly = (bool) $this->option('full');
+        $typesOnly = (bool) $this->option('types');
+        $statesOnly = (bool) $this->option('states');
+        $citiesOnly = (bool) $this->option('cities');
         $doFull = $fullOnly || (! $typesOnly && ! $statesOnly && ! $citiesOnly);
         $doTypes = $typesOnly || (! $fullOnly && ! $statesOnly && ! $citiesOnly);
         $doStates = $statesOnly || (! $fullOnly && ! $typesOnly && ! $citiesOnly);
